@@ -8,6 +8,7 @@ import { TransactionDetailModal } from '../transactions/TransactionDetailModal';
 import { UpdateNotificationPrompt } from '../pwa/UpdateNotificationPrompt';
 import { InstallPwaBanner } from '../pwa/InstallPwaBanner';
 import { usePwaUpdate } from '../../hooks/usePwaUpdate';
+import { useNativeApp } from '../../hooks/useNativeApp';
 import { Transaction } from '../../types/transaction';
 
 export const AppLayout: React.FC = () => {
@@ -16,6 +17,22 @@ export const AppLayout: React.FC = () => {
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
 
   const { needRefresh, dismissUpdate, applyUpdate } = usePwaUpdate();
+
+  // Android hardware back button and theme-aware status bar
+  useNativeApp({
+    onBackWhenModalOpen: () => {
+      if (isAddModalOpen) {
+        setIsAddModalOpen(false);
+        setEditingTransaction(null);
+        return true;
+      }
+      if (selectedTransaction) {
+        setSelectedTransaction(null);
+        return true;
+      }
+      return false;
+    },
+  });
 
   const handleOpenAdd = () => {
     setEditingTransaction(null);

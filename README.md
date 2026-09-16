@@ -88,6 +88,7 @@ Designed for funds received from parents, family, stipends, or scholarships that
 | **Routing** | [React Router 6](https://reactrouter.com/) (`HashRouter`) | Zero-404 routing across GitHub Pages subpaths and offline environments |
 | **Local Database** | [IndexedDB](https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API) via [`idb`](https://github.com/jakearchibald/idb) | Transactional, structured local-first persistence |
 | **PWA & SW** | [`vite-plugin-pwa`](https://vite-pwa-org.netlify.app/) (Workbox) | Offline precaching, service worker generation, and update detection |
+| **Native Shell** | [Capacitor 8](https://capacitorjs.com/) (`@capacitor/android`, `@capacitor/app`, etc.) | Android runtime shell, back button handling, status bar, and splash screen |
 | **CI/CD** | GitHub Actions | Automated build and deployment to GitHub Pages |
 
 ---
@@ -99,6 +100,15 @@ FinTracker/
 ├── .github/
 │   └── workflows/
 │       └── deploy.yml              # Automated GitHub Pages CI/CD workflow
+├── android/                        # Capacitor native Android project
+│   ├── app/
+│   │   ├── src/main/
+│   │   │   ├── AndroidManifest.xml # Zero-privilege manifest (INTERNET only)
+│   │   │   ├── java/com/fintracker/app/MainActivity.java
+│   │   │   └── res/                # Branded ₹ adaptive launcher icons & splash screens
+│   │   └── build.gradle
+│   ├── gradle/
+│   └── build.gradle
 ├── public/
 │   ├── favicon.svg                 # Indian Rupee vector favicon
 │   ├── pwa-192x192.png             # PWA app icon (192x192)
@@ -129,6 +139,7 @@ FinTracker/
 │   │   ├── index.ts                # Repositories (Transaction, Category, Source, Receipt, Settings)
 │   │   └── schema.ts               # IDB schema v1 definition
 │   ├── hooks/
+│   │   ├── useNativeApp.ts          # Android hardware back button, status bar & keyboard bridge
 │   │   └── usePwaUpdate.ts          # Service worker update detection hook
 │   ├── pages/
 │   │   ├── CategoriesPage.tsx      # Custom category manager with migration safeguards
@@ -140,7 +151,8 @@ FinTracker/
 │   │   └── TransactionsPage.tsx    # Transaction history with search & filters
 │   ├── services/
 │   │   ├── exportService.ts        # JSON backup & CSV spreadsheet generation
-│   │   └── importService.ts        # Defensive JSON/CSV parser and duplicate detector
+│   │   ├── importService.ts        # Defensive JSON/CSV parser and duplicate detector
+│   │   └── native/                 # Platform detection & future native detection interface
 │   ├── types/
 │   │   ├── category.ts
 │   │   ├── otherMoney.ts
@@ -154,6 +166,7 @@ FinTracker/
 │   ├── App.tsx                     # Top-level routing & context providers
 │   ├── index.css                   # Tailwind styles and mobile safe-area insets
 │   └── main.tsx                    # React mounting entry point
+├── capacitor.config.ts             # Capacitor configuration (appId: com.fintracker.app)
 ├── index.html                      # HTML root with PWA meta tags
 ├── package.json
 ├── postcss.config.js
@@ -268,7 +281,90 @@ FinTracker includes a preconfigured GitHub Actions workflow in [`.github/workflo
 
 ---
 
-## 9. How the Update System Works
+## 9. Android App Development & Native Build (Capacitor)
+
+FinTracker includes a complete native Android application shell built with **Capacitor 8**. The native Android project is located in `android/` with package ID `com.fintracker.app`.
+
+### 🏗️ Hybrid Architecture Overview
+* **Web UI Layer**: The production React 18 SPA (compiled into `dist/`) is copied into `android/app/src/main/assets/public/` during sync.
+* **Capacitor Native Shell**: Boots the WebView at `http://localhost`, maintaining identical IndexedDB persistence, PWA offline caching, and responsive rendering.
+* **Hardware Bridge**:
+  * **Android Back Button**: Handled via `@capacitor/app`. Hardware back presses pop open modals first; if no modals are active, navigate backward in history; and only exit the application when at the root route (`/`).
+  * **Status Bar Integration**: Dynamically toggles between Light and Dark status bar styles via `@capacitor/status-bar` to seamlessly match FinTracker's theme palette.
+  * **Splash Screen**: Managed via `@capacitor/splash-screen` with a custom emerald theme (`#059669`) and Indian Rupee brand icon.
+  * **Keyboard Resizing**: Configured with `KeyboardResize.Body` to ensure form inputs remain fully visible when the soft keyboard appears.
+* **Zero-Permission Privacy Guarantee**: FinTracker's `AndroidManifest.xml` only requests standard `android.permission.INTERNET`. No background SMS reading, notification listening, or sensitive phone permissions are requested in this phase.
+
+### 📋 Prerequisites
+* **Node.js**: `v18+` (Tested on `v22.14.0`)
+* **Java Development Kit (JDK)**: JDK 17 or JDK 21 (Tested on `openjdk 21.0.9`)
+* **Android SDK**: Android 14+ (API 34/35/36) installed via Android Studio or command-line tools
+  * Set `ANDROID_HOME` or configure `android/local.properties`:
+    ```properties
+    sdk.dir=C:\\Android\\Sdk
+    ```
+
+### 🛠️ CLI Commands & Workflow
+
+#### 1. Build and Synchronize Web Assets to Android
+Whenever you modify web source files, sync them to the Android project:
+```bash
+npm run android:sync
+```
+*(Runs `npm run build && npx cap sync android`)*
+
+#### 2. Open Project in Android Studio
+To inspect native code, run in Android emulators, or use the visual layout inspector:
+```bash
+npm run android:open
+```
+*(Runs `npx cap open android`)*
+
+#### 3. Build Debug APK via Command Line
+To compile a standalone debug APK without opening Android Studio:
+```bash
+npm run android:build
+```
+The compiled APK will be generated at:
+```text
+android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+#### 4. Install APK on a Physical Android Device
+1. Enable **Developer Options** and **USB Debugging** on your Android device.
+2. Connect your device via USB.
+3. Install and run via `adb`:
+   ```bash
+   adb install -r android/app/build/outputs/apk/debug/app-debug.apk
+   ```
+
+---
+
+## 10. Future Native Feature Architecture (V2 Specification)
+
+> [!NOTE]
+> FinTracker V1 intentionally omits background SMS reading and notification listener services to ensure maximum platform stability, privacy compliance, and cross-platform consistency. The architecture is designed with modular abstractions in `src/services/native/` ready for future expansion.
+
+```mermaid
+graph TD
+    A["Android Native Service<br/>(SMS Receiver / NotificationListener)"] -->|"Extract raw message string"| B["Local Regex Extraction Engine<br/>(UPI ref, Bank, Amount, Date)"]
+    B -->|"Draft Transaction Payload"| C["Staging Review Queue<br/>(Pending Approval Table)"]
+    C -->|"Notify UI"| D["FinTracker Review Modal<br/>(Amount, Category, Paid-From)"]
+    D -->|"User Approves & Assigns"| E["FinanceContext / IndexedDB<br/>(Committed to Ledger)"]
+    D -->|"User Dismisses"| F["Discard Draft<br/>(Zero False Records)"]
+```
+
+### Future Transaction Pipeline (6 Stages):
+1. **SMS & Notification Ingestion**: Android native `BroadcastReceiver` / `NotificationListenerService` capturing incoming SMS or banking push notifications (e.g. HDFC, SBI, ICICI, Google Pay, PhonePe, Paytm).
+2. **Local Regex Extraction**: Extracts transaction amount (`₹X,XXX.XX`), transaction type (`debited` vs `credited`), counterparty/merchant, and bank/UPI reference number entirely on-device without cloud transmission.
+3. **Staging Review Queue**: Incoming detections are placed in a staging queue (`pendingTransactions`). **No transactions are ever automatically written to the main ledger without explicit user confirmation.**
+4. **Interactive Approval UI**: When the user opens the app, a banner alerts them: *"1 new transaction detected from UPI: ₹450 to Swiggy. Review?"*
+5. **Smart Category Suggestion & Memory**: Suggests categories based on past merchant mappings (e.g. "Swiggy" → *Food & Dining*).
+6. **Persistence**: Upon user confirmation, commits the transaction to IndexedDB with full balance recalculation.
+
+---
+
+## 11. How the Update System Works
 
 1. When a new version is pushed to GitHub Pages, the browser's background Service Worker detects the updated build hash during its registration cycle.
 2. The `usePwaUpdate` hook listens for the `needRefresh` event from Workbox.
@@ -282,10 +378,11 @@ FinTracker includes a preconfigured GitHub Actions workflow in [`.github/workflo
    * The new Service Worker calls `skipWaiting()`.
    * The window reloads smoothly.
    * **All financial records in IndexedDB remain 100% untouched and preserved.**
+6. *On native Android builds, the app runs offline from local assets with no update prompt displayed.*
 
 ---
 
-## 10. How Data is Stored
+## 12. How Data is Stored
 
 All application state is persisted in the client's browser using **IndexedDB**:
 * **Database Name**: `fintracker_db`
@@ -301,7 +398,7 @@ The data layer uses an abstracted repository architecture (`src/db/index.ts`). U
 
 ---
 
-## 11. Known Limitations in V1
+## 13. Known Limitations in V1
 
 * **Single Device Persistence**: Because V1 is local-first without a cloud database, data entered on one phone does not automatically sync to another phone without using the **JSON Export & Import** feature.
 * **Browser Storage Eviction Safeguard**: While modern browsers preserve IndexedDB reliably, clearing browser site data manually in browser settings will delete local storage. *Always keep regular JSON backups via Settings > Export JSON Backup.*
@@ -309,16 +406,19 @@ The data layer uses an abstracted repository architecture (`src/db/index.ts`). U
 
 ---
 
-## 12. Recommended Roadmap for V2
+## 14. Recommended Roadmap for V2
 
 1. **Optional Google / Passkey Cloud Sync**:
    * End-to-end encrypted backup to Google Drive or optional private cloud server.
    * Multi-device synchronization with conflict resolution.
-2. **Budgeting & Spending Limits**:
+2. **Native SMS & Notification Transaction Detection**:
+   * Add Android SMS receiver and notification listener plugins for automated transaction drafts as designed in Section 10.
+3. **Budgeting & Spending Limits**:
    * Monthly budget limits per category (e.g. Food budget of ₹5,000) with visual warning alerts.
-3. **Recurring Transactions**:
+4. **Recurring Transactions**:
    * Automated scheduling for monthly rents, subscriptions, recharge, or salaries.
-4. **Biometric Security**:
-   * Optional WebAuthn / Face ID / Fingerprint app lock on open.
-5. **Receipt Attachment Support**:
+5. **Biometric Security**:
+   * Native biometric authentication (Fingerprint / Face Unlock) via `@capacitor/biometrics`.
+6. **Receipt Attachment Support**:
    * Store compressed bill/receipt photos offline using IndexedDB Blob storage.
+

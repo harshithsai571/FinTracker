@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Download, X } from 'lucide-react';
 import { Button } from '../common/Button';
+import { isNativePlatform } from '../../services/native';
 
 export const InstallPwaBanner: React.FC = () => {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
@@ -16,7 +17,7 @@ export const InstallPwaBanner: React.FC = () => {
     return () => window.removeEventListener('beforeinstallprompt', handler);
   }, []);
 
-  if (!deferredPrompt || isDismissed) return null;
+  if (isNativePlatform() || !deferredPrompt || isDismissed) return null;
 
   const handleInstall = async () => {
     if (!deferredPrompt) return;
