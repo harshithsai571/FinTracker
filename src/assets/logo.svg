@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="brandGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#10b981" />
+      <stop offset="50%" stop-color="#059669" />
+      <stop offset="100%" stop-color="#047857" />
+    </linearGradient>
+    <linearGradient id="innerGlow" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.2" />
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0" />
+    </linearGradient>
+    <filter id="dropShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#022c22" flood-opacity="0.3" />
+    </filter>
+  </defs>
+  
+  <!-- Outer Rounded Badge -->
+  <rect x="32" y="32" width="448" height="448" rx="112" fill="url(#brandGrad)" filter="url(#dropShadow)" />
+  
+  <!-- Inner Highlight Glow -->
+  <rect x="36" y="36" width="440" height="220" rx="108" fill="url(#innerGlow)" />
+  
+  <!-- Accent Subtle Growth Circle -->
+  <circle cx="390" cy="122" r="18" fill="#34d399" />
+
+  <!-- Clean Indian Rupee Symbol (₹) Vector Geometry -->
+  <g fill="#ffffff">
+    <rect x="144" y="136" width="224" height="34" rx="17" />
+    <rect x="144" y="202" width="224" height="34" rx="17" />
+    <rect x="180" y="136" width="34" height="240" rx="17" />
+    <path d="M 214,152 L 276,152 C 324,152 352,180 352,224 C 352,268 324,296 276,296 L 214,296 Z" fill="none" stroke="#ffffff" stroke-width="34" stroke-linecap="round" stroke-linejoin="round" />
+    <path d="M 236,280 L 340,388" stroke="#ffffff" stroke-width="36" stroke-linecap="round" />
+  </g>
+</svg>
