@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
 import { Header } from './Header';
 import { BottomNav } from './BottomNav';
@@ -7,20 +7,46 @@ import { TransactionFormModal } from '../transactions/TransactionFormModal';
 import { TransactionDetailModal } from '../transactions/TransactionDetailModal';
 import { UpdateNotificationPrompt } from '../pwa/UpdateNotificationPrompt';
 import { InstallPwaBanner } from '../pwa/InstallPwaBanner';
+import { NativeUpdateModal } from '../native/NativeUpdateModal';
 import { usePwaUpdate } from '../../hooks/usePwaUpdate';
 import { useNativeApp } from '../../hooks/useNativeApp';
+import { isAndroidNative } from '../../services/native';
+import { updateService, ReleaseInfo } from '../../services/native/updateService';
+import { APP_VERSION } from '../../config/version';
 import { Transaction } from '../../types/transaction';
 
 export const AppLayout: React.FC = () => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
+  const [nativeRelease, setNativeRelease] = useState<ReleaseInfo | null>(null);
+  const [isNativeUpdateOpen, setIsNativeUpdateOpen] = useState(false);
 
   const { needRefresh, dismissUpdate, applyUpdate } = usePwaUpdate();
+
+  // Startup background check for Android APK updates (respecting 24h cooldown)
+  useEffect(() => {
+    if (!isAndroidNative()) return;
+    updateService
+      .checkForUpdate(false)
+      .then(res => {
+        if (res.status === 'update_available') {
+          setNativeRelease(res.release);
+          setIsNativeUpdateOpen(true);
+        }
+      })
+      .catch(err => {
+        console.debug('Background update check skipped:', err);
+      });
+  }, []);
 
   // Android hardware back button and theme-aware status bar
   useNativeApp({
     onBackWhenModalOpen: () => {
+      if (isNativeUpdateOpen) {
+        setIsNativeUpdateOpen(false);
+        return true;
+      }
       if (isAddModalOpen) {
         setIsAddModalOpen(false);
         setEditingTransaction(null);
@@ -82,11 +108,23 @@ export const AppLayout: React.FC = () => {
         onEdit={handleEditTransaction}
       />
 
-      {/* PWA Update Notification Prompt */}
+      {/* PWA Update Notification Prompt (Web / PWA only) */}
       <UpdateNotificationPrompt
         needRefresh={needRefresh}
         onUpdate={applyUpdate}
         onDismiss={dismissUpdate}
+      />
+
+      {/* Android In-App Native Update Modal */}
+      <NativeUpdateModal
+        isOpen={isNativeUpdateOpen}
+        onClose={() => setIsNativeUpdateOpen(false)}
+        release={nativeRelease}
+        currentVersion={APP_VERSION}
+        onUpdate={(downloadUrl) => {
+          setIsNativeUpdateOpen(false);
+          updateService.launchApkInstaller(downloadUrl);
+        }}
       />
     </div>
   );

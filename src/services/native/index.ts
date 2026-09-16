@@ -43,6 +43,20 @@ export function isNativePlatform(): boolean {
 }
 
 /**
+ * Returns true if running specifically inside native Android container
+ */
+export function isAndroidNative(): boolean {
+  return Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
+}
+
+/**
+ * Returns true if running in a standard web browser or installed web PWA
+ */
+export function isWeb(): boolean {
+  return !Capacitor.isNativePlatform();
+}
+
+/**
  * Returns the current platform name: 'android' | 'ios' | 'web'
  */
 export function getPlatform(): PlatformType {

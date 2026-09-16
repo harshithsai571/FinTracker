@@ -8,7 +8,10 @@ import { Button } from '../components/common/Button';
 import { ConfirmDialog } from '../components/common/ConfirmDialog';
 import { DataImportModal } from '../components/settings/DataImportModal';
 import { exportCompleteBackupJson, exportTransactionsToCsv } from '../services/exportService';
-import { APP_VERSION, APP_RELEASE_DATE, APP_CHANGELOG } from '../config/version';
+import { APP_VERSION, APP_VERSION_CODE, APP_RELEASE_DATE, APP_CHANGELOG } from '../config/version';
+import { isAndroidNative } from '../services/native';
+import { updateService, ReleaseInfo } from '../services/native/updateService';
+import { NativeUpdateModal } from '../components/native/NativeUpdateModal';
 import {
   Sun,
   Moon,
@@ -29,12 +32,43 @@ export const SettingsPage: React.FC = () => {
   const { theme, setTheme } = useTheme();
   const { transactions, categories, moneySources, resetAllData } = useFinance();
   const { showSuccess, showError } = useToast();
-  const { checking, checkForUpdates } = usePwaUpdate();
+  const { checking: pwaChecking, checkForUpdates: checkPwaUpdates } = usePwaUpdate();
+
+  const isAndroid = isAndroidNative();
+  const [nativeChecking, setNativeChecking] = useState(false);
+  const [availableRelease, setAvailableRelease] = useState<ReleaseInfo | null>(null);
+  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
 
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
   const [exporting, setExporting] = useState<'json' | 'csv' | null>(null);
+
+  const handleCheckForUpdates = async () => {
+    if (isAndroid) {
+      setNativeChecking(true);
+      try {
+        const result = await updateService.checkForUpdate(true);
+        if (result.status === 'update_available') {
+          setAvailableRelease(result.release);
+          setIsUpdateModalOpen(true);
+        } else if (result.status === 'up_to_date') {
+          showSuccess('Up to Date', `FinTracker v${APP_VERSION} is the latest version available.`);
+        } else if (result.status === 'offline') {
+          showError('Offline', 'Cannot check for updates without an internet connection.');
+        } else {
+          showError('Update Check Failed', result.message);
+        }
+      } catch (err: any) {
+        showError('Update Check Failed', err.message || 'An unexpected error occurred.');
+      } finally {
+        setNativeChecking(false);
+      }
+    } else {
+      await checkPwaUpdates();
+      showSuccess('Update Check Complete', 'You are running the latest version of FinTracker.');
+    }
+  };
 
   const handleExportJson = async () => {
     setExporting('json');
@@ -259,17 +293,14 @@ export const SettingsPage: React.FC = () => {
               Installed Version
             </p>
             <p className="text-[11px] text-surface-500 dark:text-surface-400">
-              v{APP_VERSION} • {APP_RELEASE_DATE}
+              v{APP_VERSION} {isAndroid ? `(Build ${APP_VERSION_CODE})` : ''} • {APP_RELEASE_DATE}
             </p>
           </div>
           <Button
             variant="outline"
             size="sm"
-            onClick={async () => {
-              await checkForUpdates();
-              showSuccess('Update Check Complete', 'You are running the latest version of FinTracker.');
-            }}
-            isLoading={checking}
+            onClick={handleCheckForUpdates}
+            isLoading={isAndroid ? nativeChecking : pwaChecking}
             leftIcon={<RefreshCw className="w-3.5 h-3.5" />}
             className="text-xs font-semibold"
           >
@@ -309,6 +340,18 @@ export const SettingsPage: React.FC = () => {
         confirmText="Yes, Wipe All Data"
         isDestructive={true}
         isLoading={isClearing}
+      />
+
+      {/* Android In-App Native Update Modal */}
+      <NativeUpdateModal
+        isOpen={isUpdateModalOpen}
+        onClose={() => setIsUpdateModalOpen(false)}
+        release={availableRelease}
+        currentVersion={APP_VERSION}
+        onUpdate={(downloadUrl) => {
+          setIsUpdateModalOpen(false);
+          updateService.launchApkInstaller(downloadUrl);
+        }}
       />
     </div>
   );

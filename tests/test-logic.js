@@ -76,13 +76,21 @@ test('CSV Escaping against formula injection and quotes', () => {
 // Test 5: Version comparison
 test('Semantic version comparison', () => {
   function compareVersions(v1, v2) {
-    const parse = (v) => v.replace(/^v/i, '').split('.').map(num => parseInt(num, 10) || 0);
-    const p1 = parse(v1);
-    const p2 = parse(v2);
+    const sanitize = (v) =>
+      v
+        .trim()
+        .replace(/^v/i, '')
+        .split('-')[0]
+        .split('.')
+        .map(num => parseInt(num, 10) || 0);
+
+    const p1 = sanitize(v1);
+    const p2 = sanitize(v2);
     const len = Math.max(p1.length, p2.length);
+
     for (let i = 0; i < len; i++) {
-      const num1 = p1[i] || 0;
-      const num2 = p2[i] || 0;
+      const num1 = p1[i] ?? 0;
+      const num2 = p2[i] ?? 0;
       if (num1 > num2) return 1;
       if (num1 < num2) return -1;
     }
@@ -93,4 +101,70 @@ test('Semantic version comparison', () => {
   assert.strictEqual(compareVersions('1.1.0', '1.0.0'), 1);
   assert.strictEqual(compareVersions('1.0.0', '1.0.1'), -1);
   assert.strictEqual(compareVersions('2.0.0', '1.9.9'), 1);
+  assert.strictEqual(compareVersions('1.10.0', '1.9.0'), 1, '1.10.0 must be greater than 1.9.0 (non-alphabetical)');
+  assert.strictEqual(compareVersions('v1.2.0', '1.2.0'), 0, 'Leading v prefix should be normalized');
+  assert.strictEqual(compareVersions('1.0.0', '1.1.0'), -1, 'Older version should return -1');
+  assert.strictEqual(compareVersions('1.2.3-beta', '1.2.3'), 0, 'Pre-release suffixes should be stripped');
 });
+
+// Test 6: GitHub Release APK Asset Extraction
+test('GitHub Release APK Asset Extraction', () => {
+  function parseReleaseResponse(data) {
+    if (!data || !data.tag_name) return null;
+    const version = data.tag_name.replace(/^v/i, '').trim();
+
+    const apkAsset = (data.assets || []).find(
+      asset =>
+        asset.name.endsWith('.apk') &&
+        !asset.name.includes('-unsigned')
+    ) || (data.assets || []).find(asset => asset.name.endsWith('.apk'));
+
+    if (!apkAsset) return null;
+
+    return {
+      version,
+      tagName: data.tag_name,
+      title: data.name || `FinTracker v${version}`,
+      releaseNotes: data.body || '',
+      publishedAt: data.published_at,
+      downloadUrl: apkAsset.browser_download_url,
+      assetName: apkAsset.name,
+      assetSize: apkAsset.size,
+    };
+  }
+
+  const mockRelease = {
+    tag_name: 'v1.1.0',
+    name: 'FinTracker v1.1.0',
+    body: '* Added release APK\n* Bug fixes',
+    published_at: '2026-09-16T12:00:00Z',
+    assets: [
+      { name: 'FinTracker-v1.1.0-unsigned.apk', size: 3400000, browser_download_url: 'https://github.com/releases/download/v1.1.0/FinTracker-v1.1.0-unsigned.apk' },
+      { name: 'FinTracker-v1.1.0.apk', size: 3450000, browser_download_url: 'https://github.com/releases/download/v1.1.0/FinTracker-v1.1.0.apk' },
+      { name: 'FinTracker-v1.1.0.apk.sha256', size: 64, browser_download_url: 'https://github.com/releases/download/v1.1.0/FinTracker-v1.1.0.apk.sha256' },
+    ],
+  };
+
+  const parsed = parseReleaseResponse(mockRelease);
+  assert.ok(parsed, 'Parsed release should not be null');
+  assert.strictEqual(parsed.version, '1.1.0');
+  assert.strictEqual(parsed.assetName, 'FinTracker-v1.1.0.apk', 'Should prioritize signed APK over unsigned or checksum file');
+  assert.strictEqual(parsed.downloadUrl, 'https://github.com/releases/download/v1.1.0/FinTracker-v1.1.0.apk');
+});
+
+// Test 7: Update Cooldown Logic
+test('Update Cooldown (24-hour interval)', () => {
+  const AUTO_CHECK_COOLDOWN_MS = 24 * 60 * 60 * 1000;
+  const now = Date.now();
+
+  const shouldAutoCheck = (lastCheckTimestamp) => {
+    if (!lastCheckTimestamp) return true;
+    return (now - lastCheckTimestamp) >= AUTO_CHECK_COOLDOWN_MS;
+  };
+
+  assert.strictEqual(shouldAutoCheck(null), true, 'First launch should always check');
+  assert.strictEqual(shouldAutoCheck(now - 1000), false, '1 second ago should be suppressed by cooldown');
+  assert.strictEqual(shouldAutoCheck(now - 12 * 60 * 60 * 1000), false, '12 hours ago should be suppressed by cooldown');
+  assert.strictEqual(shouldAutoCheck(now - 25 * 60 * 60 * 1000), true, '25 hours ago should trigger an update check');
+});
+

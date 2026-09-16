@@ -1,7 +1,13 @@
 export const APP_VERSION = '1.0.0';
+export const APP_VERSION_CODE = 1;
 export const APP_NAME = 'FinTracker';
 export const APP_RELEASE_DATE = 'September 2026';
 export const APP_TAGLINE = 'Premium Local-First Personal Finance';
+
+export const GITHUB_REPO_OWNER = 'harshithsai571';
+export const GITHUB_REPO_NAME = 'FinTracker';
+export const GITHUB_RELEASES_API = `https://api.github.com/repos/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/releases/latest`;
+export const GITHUB_RELEASES_PAGE = `https://github.com/harshithsai571/${GITHUB_REPO_NAME}/releases/latest`;
 
 export interface VersionInfo {
   version: string;
@@ -28,16 +34,32 @@ export const APP_CHANGELOG: VersionInfo[] = [
   }
 ];
 
+/**
+ * Compare two semantic version strings.
+ * Returns:
+ *   1 if v1 > v2 (e.g. 1.1.0 > 1.0.0, 1.10.0 > 1.9.0)
+ *  -1 if v1 < v2
+ *   0 if v1 === v2
+ */
 export function compareVersions(v1: string, v2: string): number {
-  const parse = (v: string) => v.replace(/^v/i, '').split('.').map(num => parseInt(num, 10) || 0);
-  const p1 = parse(v1);
-  const p2 = parse(v2);
+  const sanitize = (v: string) =>
+    v
+      .trim()
+      .replace(/^v/i, '')
+      .split('-')[0] // remove pre-release tags like -beta or -rc
+      .split('.')
+      .map(num => parseInt(num, 10) || 0);
+
+  const p1 = sanitize(v1);
+  const p2 = sanitize(v2);
   const len = Math.max(p1.length, p2.length);
+
   for (let i = 0; i < len; i++) {
-    const num1 = p1[i] || 0;
-    const num2 = p2[i] || 0;
+    const num1 = p1[i] ?? 0;
+    const num2 = p2[i] ?? 0;
     if (num1 > num2) return 1;
     if (num1 < num2) return -1;
   }
   return 0;
 }
+

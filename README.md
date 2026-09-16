@@ -264,16 +264,16 @@ FinTracker includes a preconfigured GitHub Actions workflow in [`.github/workflo
 
 ---
 
-## 8. How to Install the PWA on Mobile Devices
+## 8. How to Install the PWA on Mobile Devices (Web Version)
 
 ### On Android (Chrome / Edge / Brave / Firefox)
-1. Open the deployed application URL in Chrome: `https://<your-username>.github.io/FinTracker/`.
+1. Open the deployed application URL in Chrome: `https://harshithsai571.github.io/FinTracker/`.
 2. A prompt **"Install FinTracker PWA"** will appear automatically at the top of the screen. Tap **Install**.
 3. If not shown, tap the browser's **three dots (⋮)** menu and select **"Add to Home screen"** or **"Install App"**.
 4. FinTracker will appear on your home screen and app drawer with the native ₹ logo and launch in standalone full-screen mode.
 
 ### On iOS (Safari)
-1. Open the deployed application URL in Safari: `https://<your-username>.github.io/FinTracker/`.
+1. Open the deployed application URL in Safari: `https://harshithsai571.github.io/FinTracker/`.
 2. Tap the **Share button** (square with an upward arrow) at the bottom toolbar.
 3. Scroll down and tap **"Add to Home Screen"**.
 4. Confirm the name **FinTracker** and tap **Add**.
@@ -281,66 +281,140 @@ FinTracker includes a preconfigured GitHub Actions workflow in [`.github/workflo
 
 ---
 
-## 9. Android App Development & Native Build (Capacitor)
+## 9. Download FinTracker for Android
 
-FinTracker includes a complete native Android application shell built with **Capacitor 8**. The native Android project is located in `android/` with package ID `com.fintracker.app`.
+FinTracker is available as a native Android application package (`.apk`) distributed through official GitHub Releases.
 
-### 🏗️ Hybrid Architecture Overview
-* **Web UI Layer**: The production React 18 SPA (compiled into `dist/`) is copied into `android/app/src/main/assets/public/` during sync.
-* **Capacitor Native Shell**: Boots the WebView at `http://localhost`, maintaining identical IndexedDB persistence, PWA offline caching, and responsive rendering.
-* **Hardware Bridge**:
-  * **Android Back Button**: Handled via `@capacitor/app`. Hardware back presses pop open modals first; if no modals are active, navigate backward in history; and only exit the application when at the root route (`/`).
-  * **Status Bar Integration**: Dynamically toggles between Light and Dark status bar styles via `@capacitor/status-bar` to seamlessly match FinTracker's theme palette.
-  * **Splash Screen**: Managed via `@capacitor/splash-screen` with a custom emerald theme (`#059669`) and Indian Rupee brand icon.
-  * **Keyboard Resizing**: Configured with `KeyboardResize.Body` to ensure form inputs remain fully visible when the soft keyboard appears.
-* **Zero-Permission Privacy Guarantee**: FinTracker's `AndroidManifest.xml` only requests standard `android.permission.INTERNET`. No background SMS reading, notification listening, or sensitive phone permissions are requested in this phase.
+* 📥 **[Download Latest Android Release APK](https://github.com/harshithsai571/FinTracker/releases/latest)**
+* 🗄️ **[Browse All Previous Releases & Changelogs](https://github.com/harshithsai571/FinTracker/releases)**
 
-### 📋 Prerequisites
+> [!NOTE]
+> Release APK binaries are attached directly as downloadable assets on GitHub Releases and are **never committed into the Git source repository**.
+
+---
+
+## 10. Installing the Android APK
+
+1. **Download**: Download the latest release APK (e.g. `FinTracker-v1.0.0.apk`) from the [Latest Release page](https://github.com/harshithsai571/FinTracker/releases/latest) on your Android device.
+2. **Open APK**: Tap the download completion notification or navigate to your **Downloads** folder in the Files app.
+3. **Allow Installation**: If prompted, allow your browser or file manager to **Install unknown apps** (*Settings > Apps > Special app access > Install unknown apps*).
+4. **Confirm Install / Update**: Tap **Install** (or **Update** if upgrading an existing version).
+5. **Data Safety**: Upgrading FinTracker over an existing installation **100% preserves your IndexedDB financial records, transactions, and categories intact**.
+
+---
+
+## 11. Updating FinTracker
+
+FinTracker features a dual-track, zero-confusion update distribution system:
+
+### A. Web / PWA Updates (Browser)
+* The browser's background Service Worker detects deployed updates from GitHub Pages.
+* An in-app slide-up prompt alerts the user: *"New FinTracker version available"*.
+* Tapping **Update now** activates the new Service Worker and reloads without touching IndexedDB data.
+
+### B. Native Android Updates (In-App GitHub Release Checker)
+* **Automatic Startup Check**: When the native Android app boots, `updateService` polls the public GitHub Releases endpoint (`https://api.github.com/repos/harshithsai571/FinTracker/releases/latest`) with a 24-hour cooldown interval to avoid rate limiting or battery drain.
+* **Manual Check Anytime**: Navigate to **Settings > About FinTracker** and tap **Check for updates**.
+* **Semantic Comparison**: Uses `compareVersions` to detect if the release tag is newer than the installed app version (e.g. `1.1.0` > `1.0.0`).
+* **Update Dialog**: Displays what's new in the release with bulleted highlights.
+* **Update Now**: Safely downloads the verified HTTPS APK from GitHub Releases and triggers the standard Android package installer.
+* **Offline Resilience**: Silently ignores failed checks when offline, allowing normal offline finance tracking.
+
+---
+
+## 12. Creating an Android Release
+
+FinTracker utilizes automated GitHub Actions release automation in [`.github/workflows/android-release.yml`](.github/workflows/android-release.yml).
+
+### Standard Release Workflow:
+1. Ensure all code changes are committed and pushed to `main`:
+   ```bash
+   git push origin main
+   ```
+2. Create and push a semantic version tag:
+   ```bash
+   git tag v1.1.0
+   git push origin v1.1.0
+   ```
+3. **Automated CI/CD**: GitHub Actions automatically:
+   * Checks out the repository and installs dependencies (`npm ci`).
+   * Runs the automated test suite (`npm test`).
+   * Compiles the production web assets (`npm run build`).
+   * Synchronizes assets to the Android native shell (`npx cap sync android`).
+   * Decodes the release signing keystore from GitHub Secrets.
+   * Compiles the release APK using Gradle (`./gradlew assembleRelease`).
+   * Computes the SHA-256 integrity checksum (`FinTracker-v1.1.0.apk.sha256`).
+   * Creates an official GitHub Release with release notes and attaches the APK and checksum assets.
+
+---
+
+## 13. Android Signing & Keystore Configuration
+
+To publish signed APKs through GitHub Actions, configure the following **4 Repository Secrets** in your GitHub repository (*Settings > Secrets and variables > Actions*):
+
+| Secret Name | Description | Example / Notes |
+| :--- | :--- | :--- |
+| `ANDROID_KEYSTORE_BASE64` | Base64-encoded release `.keystore` / `.jks` file | `cat release.keystore \| base64 -w 0` |
+| `ANDROID_KEYSTORE_PASSWORD`| Keystore password | The password chosen during `keytool` generation |
+| `ANDROID_KEY_ALIAS` | Alias name for the signing key | e.g. `fintracker` |
+| `ANDROID_KEY_PASSWORD` | Private key password | Key password |
+
+### Generating a Release Keystore Locally:
+```bash
+keytool -genkey -v -keystore release.keystore -alias fintracker -keyalg RSA -keysize 2048 -validity 10000
+```
+
+### Encoding to Base64:
+* **Windows (PowerShell)**:
+  ```powershell
+  [Convert]::ToBase64String([IO.File]::ReadAllBytes("release.keystore")) | Set-Clipboard
+  ```
+* **macOS / Linux**:
+  ```bash
+  base64 -w 0 release.keystore | pbcopy
+  ```
+
+> [!CAUTION]
+> **NEVER commit keystore files, private keys, or passwords to Git**. The `.gitignore` file is strictly configured to ignore `*.keystore`, `*.jks`, and `local.properties`.
+> If these secrets are not configured in CI, GitHub Actions will safely build an unsigned release APK (`FinTracker-vX.Y.Z-unsigned.apk`) and log an informative warning.
+
+---
+
+## 14. Centralized Versioning Strategy
+
+FinTracker maintains a single, unified source of truth for versioning:
+
+* **Source of Truth**: [`src/config/version.ts`](src/config/version.ts)
+  * `APP_VERSION`: Current semantic release version string (e.g. `'1.0.0'`).
+  * `APP_VERSION_CODE`: Numeric Android version code (e.g. `1`).
+  * `GITHUB_REPO_OWNER`: `'harshithsai571'`.
+  * `GITHUB_REPO_NAME`: `'FinTracker'`.
+* **Android Gradle Mapping**: In `android/app/build.gradle`, `versionName` and `versionCode` dynamically read from environment variables (`APP_VERSION`, `APP_VERSION_CODE`) supplied by GitHub Actions during tag builds, falling back gracefully to defaults during local development.
+* **CI Version Derivation**: In GitHub Actions, tag `v1.2.3` automatically computes `APP_VERSION = "1.2.3"` and numeric `APP_VERSION_CODE = 10203` (`MAJOR*10000 + MINOR*100 + PATCH`), ensuring strict ascending numeric compliance for Android package managers.
+
+---
+
+## 15. Android Local Development & CLI Workflow
+
+### Prerequisites
 * **Node.js**: `v18+` (Tested on `v22.14.0`)
 * **Java Development Kit (JDK)**: JDK 17 or JDK 21 (Tested on `openjdk 21.0.9`)
 * **Android SDK**: Android 14+ (API 34/35/36) installed via Android Studio or command-line tools
-  * Set `ANDROID_HOME` or configure `android/local.properties`:
+  * Configure `android/local.properties`:
     ```properties
     sdk.dir=C:\\Android\\Sdk
     ```
 
-### 🛠️ CLI Commands & Workflow
-
-#### 1. Build and Synchronize Web Assets to Android
-Whenever you modify web source files, sync them to the Android project:
-```bash
-npm run android:sync
-```
-*(Runs `npm run build && npx cap sync android`)*
-
-#### 2. Open Project in Android Studio
-To inspect native code, run in Android emulators, or use the visual layout inspector:
-```bash
-npm run android:open
-```
-*(Runs `npx cap open android`)*
-
-#### 3. Build Debug APK via Command Line
-To compile a standalone debug APK without opening Android Studio:
-```bash
-npm run android:build
-```
-The compiled APK will be generated at:
-```text
-android/app/build/outputs/apk/debug/app-debug.apk
-```
-
-#### 4. Install APK on a Physical Android Device
-1. Enable **Developer Options** and **USB Debugging** on your Android device.
-2. Connect your device via USB.
-3. Install and run via `adb`:
-   ```bash
-   adb install -r android/app/build/outputs/apk/debug/app-debug.apk
-   ```
+### Available NPM Scripts:
+* `npm run android:sync` — Builds web assets and synchronizes them to `android/app/src/main/assets/public`.
+* `npm run android:open` — Opens `android/` project in Android Studio.
+* `npm run android:build` — Compiles a local debug APK (`android/app/build/outputs/apk/debug/app-debug.apk`).
+* `npm run android:build:release` — Compiles a local release APK (`android/app/build/outputs/apk/release/FinTracker-v1.0.0-unsigned.apk`).
+* `adb install -r <path-to-apk>` — Installs APK on a connected device or emulator.
 
 ---
 
-## 10. Future Native Feature Architecture (V2 Specification)
+## 16. Future Native Feature Architecture (V2 Specification)
 
 > [!NOTE]
 > FinTracker V1 intentionally omits background SMS reading and notification listener services to ensure maximum platform stability, privacy compliance, and cross-platform consistency. The architecture is designed with modular abstractions in `src/services/native/` ready for future expansion.
@@ -364,25 +438,7 @@ graph TD
 
 ---
 
-## 11. How the Update System Works
-
-1. When a new version is pushed to GitHub Pages, the browser's background Service Worker detects the updated build hash during its registration cycle.
-2. The `usePwaUpdate` hook listens for the `needRefresh` event from Workbox.
-3. A non-intrusive slide-up modal appears:
-   > **New FinTracker version available**  
-   > *We've added improvements and fixes. Your financial data is securely preserved.*  
-   > `[Later]` `[Update now]`
-4. **If the user taps "Later"**: The notification is dismissed, and the user can continue logging transactions uninterrupted.
-5. **If the user taps "Update now"**:
-   * `updateServiceWorker(true)` is invoked.
-   * The new Service Worker calls `skipWaiting()`.
-   * The window reloads smoothly.
-   * **All financial records in IndexedDB remain 100% untouched and preserved.**
-6. *On native Android builds, the app runs offline from local assets with no update prompt displayed.*
-
----
-
-## 12. How Data is Stored
+## 17. How Data is Stored
 
 All application state is persisted in the client's browser using **IndexedDB**:
 * **Database Name**: `fintracker_db`
@@ -398,7 +454,7 @@ The data layer uses an abstracted repository architecture (`src/db/index.ts`). U
 
 ---
 
-## 13. Known Limitations in V1
+## 18. Known Limitations in V1
 
 * **Single Device Persistence**: Because V1 is local-first without a cloud database, data entered on one phone does not automatically sync to another phone without using the **JSON Export & Import** feature.
 * **Browser Storage Eviction Safeguard**: While modern browsers preserve IndexedDB reliably, clearing browser site data manually in browser settings will delete local storage. *Always keep regular JSON backups via Settings > Export JSON Backup.*
@@ -406,13 +462,13 @@ The data layer uses an abstracted repository architecture (`src/db/index.ts`). U
 
 ---
 
-## 14. Recommended Roadmap for V2
+## 19. Recommended Roadmap for V2
 
 1. **Optional Google / Passkey Cloud Sync**:
    * End-to-end encrypted backup to Google Drive or optional private cloud server.
    * Multi-device synchronization with conflict resolution.
 2. **Native SMS & Notification Transaction Detection**:
-   * Add Android SMS receiver and notification listener plugins for automated transaction drafts as designed in Section 10.
+   * Add Android SMS receiver and notification listener plugins for automated transaction drafts as designed in Section 16.
 3. **Budgeting & Spending Limits**:
    * Monthly budget limits per category (e.g. Food budget of ₹5,000) with visual warning alerts.
 4. **Recurring Transactions**:
