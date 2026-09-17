@@ -89,7 +89,20 @@ jobs:
           java-version: '21'
 
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
+        with:
+          packages: ''
+
+      - name: Install Android SDK packages
+        run: |
+          sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Verify Android SDK
+        run: |
+          sdkmanager --list | head -n 40
+          adb version
+          ls -la "$ANDROID_SDK_ROOT/platforms/android-36"
+          ls -la "$ANDROID_SDK_ROOT/build-tools/36.0.0"
 
       - name: Prepare signing keystore
         id: keystore_prep
