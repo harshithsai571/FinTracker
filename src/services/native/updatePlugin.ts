@@ -16,6 +16,7 @@ export interface DownloadProgress {
   downloadedBytes: number;
   totalBytes: number;
   percentage: number;
+  speedBytesPerSec?: number;
   error?: string;
 }
 

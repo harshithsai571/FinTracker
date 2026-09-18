@@ -1,5 +1,5 @@
-export const APP_VERSION = '1.2.0';
-export const APP_VERSION_CODE = 3;
+export const APP_VERSION = '1.1.1';
+export const APP_VERSION_CODE = 4;
 export const APP_NAME = 'FinTracker';
 export const APP_RELEASE_DATE = 'September 2026';
 export const APP_TAGLINE = 'Premium Local-First Personal Finance';
@@ -17,6 +17,20 @@ export interface VersionInfo {
 }
 
 export const APP_CHANGELOG: VersionInfo[] = [
+  {
+    version: '1.1.1',
+    releaseDate: 'September 18, 2026',
+    title: 'Native Android In-App Update Experience',
+    highlights: [
+      'Direct native APK downloads with real-time progress and transfer speed indicators',
+      'Cryptographic SHA-256 integrity verification and package identity safety checks',
+      'Seamless Android Package Installer integration via secure FileProvider',
+      'Intelligent update detection respecting 24-hour battery and data cooldown intervals',
+      'Safe unknown app installation permission assistance with one-tap system settings access',
+      'Zero external browser redirections — update directly within the FinTracker interface',
+      'Guaranteed financial data preservation: 100% offline IndexedDB records remain intact'
+    ]
+  },
   {
     version: '1.2.0',
     releaseDate: 'September 18, 2026',

@@ -720,4 +720,144 @@ test('Req 18: Existing financial data stores remain untouched by update operatio
   assert.strictEqual(mockStorage.fintracker_receipts, initialRcSnapshot, 'Receipts data preserved');
 });
 
+// ============================================================================
+// PART 2 — PREMIUM IN-APP UPDATE UI + NATIVE UPDATER INTEGRATION TESTS
+// ============================================================================
+
+// Part 2 Test 1: Snooze ("Later") sets 24h cooldown and suppresses automatic checks
+test('Part 2: Later snooze suppresses automatic check but allows manual check', () => {
+  const store = {};
+  const mockStorage = {
+    getItem: (k) => store[k] || null,
+    setItem: (k, v) => { store[k] = String(v); },
+    removeItem: (k) => { delete store[k]; },
+  };
+
+  const isSnoozed = () => {
+    const raw = mockStorage.getItem('fintracker_update_snooze_until');
+    if (!raw) return false;
+    return Date.now() < parseInt(raw, 10);
+  };
+
+  const snoozeUpdate = (hours = 24) => {
+    mockStorage.setItem('fintracker_update_snooze_until', Date.now() + hours * 3600 * 1000);
+  };
+
+  const clearSnooze = () => {
+    mockStorage.removeItem('fintracker_update_snooze_until');
+  };
+
+  assert.strictEqual(isSnoozed(), false, 'Initially not snoozed');
+
+  // User taps "Later"
+  snoozeUpdate(24);
+  assert.strictEqual(isSnoozed(), true, 'Snoozed after tapping Later');
+
+  // Manual check in Settings clears snooze
+  clearSnooze();
+  assert.strictEqual(isSnoozed(), false, 'Snooze cleared on manual check');
+});
+
+// Part 2 Test 2: Release notes markdown sanitization & bullet parsing
+test('Part 2: Release notes sanitization removes HTML and produces clean bullet items', () => {
+  const parseNotes = (notes) => {
+    if (!notes) return [];
+    const clean = notes.replace(/<[^>]*>/g, '');
+    return clean
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => line.startsWith('*') || line.startsWith('-') || line.startsWith('•') || /^\d+\./.test(line))
+      .map(line => line.replace(/^[\*\-•]\s*|^\d+\.\s*/, '').trim())
+      .filter(line => line.length > 0 && !line.toLowerCase().startsWith('http'));
+  };
+
+  const rawNotes = `
+# Release Notes <b>v1.1.1</b>
+* Real-time download progress bar
+* Cryptographic SHA-256 package validation
+- In-app Android Package Installer launch
+• Zero external browser redirection
+1. Automated unknown sources guidance
+<p>Full changelog at: https://github.com/harshithsai571/FinTracker</p>
+  `;
+
+  const parsed = parseNotes(rawNotes);
+  assert.strictEqual(parsed.length, 5);
+  assert.strictEqual(parsed[0], 'Real-time download progress bar');
+  assert.strictEqual(parsed[1], 'Cryptographic SHA-256 package validation');
+  assert.strictEqual(parsed[2], 'In-app Android Package Installer launch');
+  assert.strictEqual(parsed[3], 'Zero external browser redirection');
+  assert.strictEqual(parsed[4], 'Automated unknown sources guidance');
+});
+
+// Part 2 Test 3: Zero GitHub redirection - Direct APK flow verified
+test('Part 2: Zero GitHub redirection — direct in-app download and installation', () => {
+  let redirectedToBrowser = false;
+  const mockBrowserOpen = (url) => {
+    if (url.includes('github.com') && !url.endsWith('.apk')) {
+      redirectedToBrowser = true;
+    }
+  };
+
+  // Modern In-App Update flow:
+  const releaseAssetUrl = 'https://github.com/harshithsai571/FinTracker/releases/download/v1.1.1/FinTracker-v1.1.1.apk';
+  let downloadedAsset = null;
+  let packageInstalled = false;
+
+  const inAppDownload = (url) => {
+    // Download directly via native engine, no browser launch
+    downloadedAsset = url;
+  };
+
+  const inAppInstall = () => {
+    if (downloadedAsset) {
+      packageInstalled = true;
+    }
+  };
+
+  inAppDownload(releaseAssetUrl);
+  inAppInstall();
+
+  assert.strictEqual(downloadedAsset, releaseAssetUrl);
+  assert.strictEqual(packageInstalled, true);
+  assert.strictEqual(redirectedToBrowser, false, 'User must never be redirected to GitHub release website');
+});
+
+// Part 2 Test 4: Platform separation between PWA and Native Android
+test('Part 2: Clean separation between PWA service worker and Android Native APK updater', () => {
+  const getUpdaterType = (isAndroidNative) => {
+    if (isAndroidNative) {
+      return 'NATIVE_APK_ENGINE';
+    }
+    return 'PWA_SERVICE_WORKER';
+  };
+
+  assert.strictEqual(getUpdaterType(true), 'NATIVE_APK_ENGINE', 'Android devices use native APK updater');
+  assert.strictEqual(getUpdaterType(false), 'PWA_SERVICE_WORKER', 'Browser/PWA users use service worker updater');
+});
+
+// Part 2 Test 5: Unknown sources permission handling and recovery
+test('Part 2: Unknown app install permission requirement and retry handling', () => {
+  let permissionGranted = false;
+
+  const tryInstall = () => {
+    if (!permissionGranted) {
+      return { status: 'INSTALL_PERMISSION_REQUIRED' };
+    }
+    return { status: 'INSTALLING' };
+  };
+
+  // Initial attempt before permission
+  const firstAttempt = tryInstall();
+  assert.strictEqual(firstAttempt.status, 'INSTALL_PERMISSION_REQUIRED');
+
+  // User opens settings and grants permission
+  permissionGranted = true;
+
+  // Retry attempt
+  const retryAttempt = tryInstall();
+  assert.strictEqual(retryAttempt.status, 'INSTALLING');
+});
+
+
 

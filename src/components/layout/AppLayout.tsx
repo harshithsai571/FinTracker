@@ -11,6 +11,7 @@ import { NativeUpdateModal } from '../native/NativeUpdateModal';
 import { usePwaUpdate } from '../../hooks/usePwaUpdate';
 import { useNativeApp } from '../../hooks/useNativeApp';
 import { isAndroidNative } from '../../services/native';
+import { App } from '@capacitor/app';
 import { updateService, ReleaseInfo } from '../../services/native/updateService';
 import { APP_VERSION } from '../../config/version';
 import { Transaction } from '../../types/transaction';
@@ -24,20 +25,43 @@ export const AppLayout: React.FC = () => {
 
   const { needRefresh, dismissUpdate, applyUpdate } = usePwaUpdate();
 
-  // Startup background check for Android APK updates (respecting 24h cooldown)
+  // Startup background check for Android APK updates (respecting 24h cooldown & non-blocking)
   useEffect(() => {
     if (!isAndroidNative()) return;
-    updateService
-      .checkForUpdate(false)
-      .then(res => {
+
+    const performCheck = async () => {
+      try {
+        const res = await updateService.checkForUpdate(false);
         if (res.status === 'update_available') {
           setNativeRelease(res.release);
           setIsNativeUpdateOpen(true);
         }
-      })
-      .catch(err => {
+      } catch (err) {
         console.debug('Background update check skipped:', err);
-      });
+      }
+    };
+
+    // Run asynchronously without delaying dashboard load
+    const timer = setTimeout(() => {
+      performCheck();
+    }, 1500);
+
+    // Foreground resume listener: check again when app returns to foreground (subject to 24h cooldown)
+    let appStateHandle: { remove: () => Promise<void> } | null = null;
+    App.addListener('appStateChange', (state) => {
+      if (state.isActive) {
+        performCheck();
+      }
+    }).then(handle => {
+      appStateHandle = handle;
+    }).catch(() => {});
+
+    return () => {
+      clearTimeout(timer);
+      if (appStateHandle) {
+        appStateHandle.remove().catch(() => {});
+      }
+    };
   }, []);
 
   // Android hardware back button and theme-aware status bar
@@ -121,10 +145,6 @@ export const AppLayout: React.FC = () => {
         onClose={() => setIsNativeUpdateOpen(false)}
         release={nativeRelease}
         currentVersion={APP_VERSION}
-        onUpdate={(downloadUrl) => {
-          setIsNativeUpdateOpen(false);
-          updateService.launchApkInstaller(downloadUrl);
-        }}
       />
     </div>
   );

@@ -61,6 +61,7 @@ export type UpdateCheckResult =
   | { status: 'error'; message: string };
 
 const STORAGE_KEY_LAST_CHECK = 'fintracker_last_update_check';
+const STORAGE_KEY_SNOOZE = 'fintracker_update_snoozed_until';
 const AUTO_CHECK_COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24 Hours
 
 export class UpdateService {
@@ -83,11 +84,54 @@ export class UpdateService {
   }
 
   /**
+   * Check if user snoozed the update dialog
+   */
+  public isSnoozed(): boolean {
+    if (typeof window === 'undefined' || !window.localStorage) return false;
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY_SNOOZE);
+      if (!raw) return false;
+      const snoozedUntil = parseInt(raw, 10);
+      return !isNaN(snoozedUntil) && Date.now() < snoozedUntil;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Snooze automatic update prompts for a specific duration (default 24h)
+   */
+  public snoozeUpdate(hours = 24): void {
+    if (typeof window === 'undefined' || !window.localStorage) return;
+    try {
+      const until = Date.now() + hours * 60 * 60 * 1000;
+      localStorage.setItem(STORAGE_KEY_SNOOZE, String(until));
+    } catch {
+      // Ignore quota errors
+    }
+  }
+
+  /**
+   * Clear any active snooze
+   */
+  public clearSnooze(): void {
+    if (typeof window === 'undefined' || !window.localStorage) return;
+    try {
+      localStorage.removeItem(STORAGE_KEY_SNOOZE);
+    } catch {
+      // Ignore
+    }
+  }
+
+  /**
    * Check if the application should perform an automatic update check
    */
   public shouldAutoCheck(): boolean {
     if (!isAndroidNative()) return false;
     if (typeof window === 'undefined' || !window.localStorage) return false;
+
+    // If snoozed by user ("Later"), suppress automatic check
+    if (this.isSnoozed()) return false;
 
     const raw = localStorage.getItem(STORAGE_KEY_LAST_CHECK);
     if (!raw) return true;

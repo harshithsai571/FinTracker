@@ -48,25 +48,26 @@ export const SettingsPage: React.FC = () => {
     if (isAndroid) {
       setNativeChecking(true);
       try {
+        updateService.clearSnooze();
         const result = await updateService.checkForUpdate(true);
         if (result.status === 'update_available') {
           setAvailableRelease(result.release);
           setIsUpdateModalOpen(true);
         } else if (result.status === 'up_to_date') {
-          showSuccess('Up to Date', `FinTracker v${APP_VERSION} is the latest version available.`);
+          showSuccess("You're using the latest version.", `FinTracker v${APP_VERSION} is the latest version.`);
         } else if (result.status === 'offline') {
-          showError('Offline', 'Cannot check for updates without an internet connection.');
+          showError("You're offline. We couldn't check for updates.", 'Please check your internet connection.');
         } else {
-          showError('Update Check Failed', result.message);
+          showError("Update couldn't be completed.", result.message);
         }
       } catch (err: any) {
-        showError('Update Check Failed', err.message || 'An unexpected error occurred.');
+        showError("Update couldn't be completed.", err.message || 'An unexpected error occurred.');
       } finally {
         setNativeChecking(false);
       }
     } else {
       await checkPwaUpdates();
-      showSuccess('Update Check Complete', 'You are running the latest version of FinTracker.');
+      showSuccess("You're using the latest version.", 'You are running the latest version of FinTracker.');
     }
   };
 
@@ -348,10 +349,6 @@ export const SettingsPage: React.FC = () => {
         onClose={() => setIsUpdateModalOpen(false)}
         release={availableRelease}
         currentVersion={APP_VERSION}
-        onUpdate={(downloadUrl) => {
-          setIsUpdateModalOpen(false);
-          updateService.launchApkInstaller(downloadUrl);
-        }}
       />
     </div>
   );
