@@ -65,6 +65,7 @@ export const ReportsPage: React.FC = () => {
   } = useMemo(() => {
     let income = 0;
     let expense = 0;
+    let refund = 0;
     const catMap = new Map<string, number>();
     const dateSet = new Set<string>();
 
@@ -72,13 +73,24 @@ export const ReportsPage: React.FC = () => {
       dateSet.add(t.date);
       if (t.type === 'income') {
         income += t.amount;
-      } else {
+      } else if (t.type === 'expense') {
         expense += t.amount;
-        catMap.set(t.categoryId, (catMap.get(t.categoryId) || 0) + t.amount);
+        if (t.splits && t.splits.length > 0) {
+          t.splits.forEach(s => {
+            if (s.categoryId) {
+              catMap.set(s.categoryId, (catMap.get(s.categoryId) || 0) + (s.amount || 0));
+            }
+          });
+        } else if (t.categoryId) {
+          catMap.set(t.categoryId, (catMap.get(t.categoryId) || 0) + t.amount);
+        }
+      } else if (t.type === 'refund') {
+        refund += t.amount;
       }
+      // Note: transfer transactions do not count as income or expense
     }
 
-    const net = income - expense;
+    const net = income + refund - expense;
     const rate = income > 0 ? Math.round(((income - expense) / income) * 100) : 0;
     const daysCount = Math.max(dateSet.size, 1);
     const avgDaily = expense / daysCount;
@@ -120,7 +132,7 @@ export const ReportsPage: React.FC = () => {
       }
       if (t.type === 'income') {
         m.income += t.amount;
-      } else {
+      } else if (t.type === 'expense') {
         m.expense += t.amount;
       }
     });
@@ -132,6 +144,7 @@ export const ReportsPage: React.FC = () => {
     return {
       totalIncome: income,
       totalExpense: expense,
+      totalRefund: refund,
       netChange: net,
       savingsRate: rate,
       highestCategory: highestCatObj,

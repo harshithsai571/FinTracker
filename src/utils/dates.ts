@@ -121,7 +121,7 @@ export function groupTransactionsByDate(transactions: Transaction[]): DateGroup<
     group.items.push(tx);
     if (tx.type === 'income') {
       group.totalIncome += tx.amount;
-    } else {
+    } else if (tx.type === 'expense') {
       group.totalExpense += tx.amount;
     }
   }

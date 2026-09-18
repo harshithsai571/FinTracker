@@ -1,12 +1,14 @@
 import { Transaction, TransactionType, PaymentMethod } from '../types/transaction';
 import { Category } from '../types/category';
 import { MoneySource, MoneyReceipt } from '../types/otherMoney';
+import { Account } from '../types/account';
 import { BackupData } from '../types/settings';
 import {
   TransactionRepository,
   CategoryRepository,
   MoneySourceRepository,
   MoneyReceiptRepository,
+  AccountRepository,
   clearAllDatabaseData
 } from '../db';
 import { parseAmount } from '../utils/currency';
@@ -24,6 +26,7 @@ export interface ImportPreviewResult {
   validCategories: Category[];
   validSources: MoneySource[];
   validReceipts: MoneyReceipt[];
+  validAccounts: Account[];
   duplicateCount: number;
   errors: ImportError[];
 }
@@ -127,6 +130,7 @@ export async function parseAndValidateJson(
       validCategories: [],
       validSources: [],
       validReceipts: [],
+      validAccounts: [],
       duplicateCount: 0,
       errors: [{ row: 0, reason: `Invalid JSON syntax: ${err.message}` }]
     };
@@ -140,6 +144,7 @@ export async function parseAndValidateJson(
       validCategories: [],
       validSources: [],
       validReceipts: [],
+      validAccounts: [],
       duplicateCount: 0,
       errors: [{ row: 0, reason: 'Root object must be a valid JSON dictionary' }]
     };
@@ -167,7 +172,9 @@ export async function parseAndValidateJson(
       return;
     }
 
-    const type: TransactionType = tx.type === 'income' ? 'income' : 'expense';
+    const type: TransactionType = ['income', 'expense', 'transfer', 'refund'].includes(tx.type)
+      ? tx.type
+      : 'expense';
     const date = parseDateString(tx.date);
     if (!date) {
       errors.push({ row: rowNum, field: 'date', reason: `Invalid date format: ${tx.date}` });
@@ -196,6 +203,10 @@ export async function parseAndValidateJson(
       description: tx.description ? String(tx.description) : '',
       paymentMethod,
       sourceId: tx.sourceId || null,
+      accountId: tx.accountId || undefined,
+      toAccountId: tx.toAccountId || undefined,
+      linkedTransactionId: tx.linkedTransactionId || undefined,
+      splits: Array.isArray(tx.splits) ? tx.splits : undefined,
       createdAt: tx.createdAt || new Date().toISOString(),
       updatedAt: tx.updatedAt || new Date().toISOString(),
     });
@@ -204,6 +215,7 @@ export async function parseAndValidateJson(
   const validCategories: Category[] = Array.isArray(data.categories) ? data.categories : [];
   const validSources: MoneySource[] = Array.isArray(data.moneySources) ? data.moneySources : [];
   const validReceipts: MoneyReceipt[] = Array.isArray(data.moneyReceipts) ? data.moneyReceipts : [];
+  const validAccounts: Account[] = Array.isArray(data.accounts) ? data.accounts : [];
 
   return {
     fileType: 'json',
@@ -212,6 +224,7 @@ export async function parseAndValidateJson(
     validCategories,
     validSources,
     validReceipts,
+    validAccounts,
     duplicateCount,
     errors,
   };
@@ -232,6 +245,7 @@ export async function parseAndValidateCsv(
       validCategories: [],
       validSources: [],
       validReceipts: [],
+      validAccounts: [],
       duplicateCount: 0,
       errors: [{ row: 0, reason: 'CSV file contains no data rows' }]
     };
@@ -257,6 +271,7 @@ export async function parseAndValidateCsv(
       validCategories: [],
       validSources: [],
       validReceipts: [],
+      validAccounts: [],
       duplicateCount: 0,
       errors: [{ row: 1, reason: 'Missing required header columns: Date and Amount must be present in the CSV' }]
     };
@@ -367,6 +382,7 @@ export async function parseAndValidateCsv(
     validCategories: [],
     validSources: [],
     validReceipts: [],
+    validAccounts: [],
     duplicateCount,
     errors,
   };
@@ -378,6 +394,10 @@ export async function executeImport(
 ): Promise<{ importedCount: number }> {
   if (mode === 'replace') {
     await clearAllDatabaseData();
+  }
+
+  if (preview.validAccounts && preview.validAccounts.length > 0) {
+    await AccountRepository.bulkPut(preview.validAccounts);
   }
 
   if (preview.validCategories.length > 0) {

@@ -30,7 +30,7 @@ import {
 
 export const SettingsPage: React.FC = () => {
   const { theme, setTheme } = useTheme();
-  const { transactions, categories, moneySources, resetAllData } = useFinance();
+  const { transactions, categories, moneySources, accounts, resetAllData } = useFinance();
   const { showSuccess, showError } = useToast();
   const { checking: pwaChecking, checkForUpdates: checkPwaUpdates } = usePwaUpdate();
 
@@ -85,7 +85,7 @@ export const SettingsPage: React.FC = () => {
   const handleExportCsv = async () => {
     setExporting('csv');
     try {
-      const filename = exportTransactionsToCsv(transactions, categories, moneySources);
+      const filename = exportTransactionsToCsv(transactions, categories, moneySources, accounts);
       showSuccess('Spreadsheet exported', `Saved file: ${filename}`);
     } catch (err: any) {
       showError('Export Failed', err.message);

@@ -2,6 +2,7 @@ import { DBSchema } from 'idb';
 import { Transaction } from '../types/transaction';
 import { Category } from '../types/category';
 import { MoneySource, MoneyReceipt } from '../types/otherMoney';
+import { Account } from '../types/account';
 
 export interface FinTrackerDB extends DBSchema {
   transactions: {
@@ -12,6 +13,15 @@ export interface FinTrackerDB extends DBSchema {
       'by-category': string;
       'by-source': string;
       'by-type': string;
+      'by-account': string;
+    };
+  };
+  accounts: {
+    key: string;
+    value: Account;
+    indexes: {
+      'by-type': string;
+      'by-archived': number;
     };
   };
   categories: {
@@ -41,4 +51,5 @@ export interface FinTrackerDB extends DBSchema {
 }
 
 export const DB_NAME = 'fintracker_db';
-export const DB_VERSION = 1;
+export const DB_VERSION = 2;
+

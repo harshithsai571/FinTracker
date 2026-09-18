@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { useFinance } from '../context/FinanceContext';
 import { BalanceCard } from '../components/dashboard/BalanceCard';
+import { AccountsOverviewWidget } from '../components/dashboard/AccountsOverviewWidget';
 import { MonthlySummaryCard } from '../components/dashboard/MonthlySummaryCard';
 import { SpendingOverview } from '../components/dashboard/SpendingOverview';
 import { OtherMoneyWidget } from '../components/dashboard/OtherMoneyWidget';
@@ -39,7 +40,10 @@ export const DashboardPage: React.FC = () => {
         otherMoneyRemaining={otherMoneySummary.remaining}
       />
 
-      {/* 2. Monthly Summary with Month Picker */}
+      {/* 2. Accounts Overview */}
+      <AccountsOverviewWidget />
+
+      {/* 3. Monthly Summary with Month Picker */}
       <MonthlySummaryCard
         selectedMonth={selectedMonth}
         onMonthChange={setSelectedMonth}

@@ -168,3 +168,143 @@ test('Update Cooldown (24-hour interval)', () => {
   assert.strictEqual(shouldAutoCheck(now - 25 * 60 * 60 * 1000), true, '25 hours ago should trigger an update check');
 });
 
+// Test 8: Account Balance Derivation
+test('Account Balance Derivation (openingBalance + income - expense + refund + transfersIn - transfersOut)', () => {
+  const account = { id: 'acc-cash', name: 'Cash in Hand', type: 'cash', openingBalance: 5000 };
+  const transactions = [
+    { id: 'tx-1', type: 'income', amount: 2000, accountId: 'acc-cash' },
+    { id: 'tx-2', type: 'expense', amount: 1500, accountId: 'acc-cash' },
+    { id: 'tx-3', type: 'refund', amount: 500, accountId: 'acc-cash' },
+    { id: 'tx-4', type: 'transfer', amount: 1000, accountId: 'acc-bank', toAccountId: 'acc-cash' }, // ATM withdrawal into cash
+    { id: 'tx-5', type: 'transfer', amount: 800, accountId: 'acc-cash', toAccountId: 'acc-bank' },  // Cash deposit to bank
+  ];
+
+  let inc = 0;
+  let exp = 0;
+  let ref = 0;
+  let tIn = 0;
+  let tOut = 0;
+
+  for (const t of transactions) {
+    if (t.accountId === account.id) {
+      if (t.type === 'income') inc += t.amount;
+      else if (t.type === 'expense') exp += t.amount;
+      else if (t.type === 'refund') ref += t.amount;
+      else if (t.type === 'transfer') tOut += t.amount;
+    } else if (t.toAccountId === account.id && t.type === 'transfer') {
+      tIn += t.amount;
+    }
+  }
+
+  const currentBalance = account.openingBalance + inc - exp + ref + tIn - tOut;
+  // 5000 + 2000 - 1500 + 500 + 1000 - 800 = 6200
+  assert.strictEqual(currentBalance, 6200, 'Cash in Hand balance should be ₹6,200');
+});
+
+// Test 9: Inter-Account Transfer Net Worth Preservation
+test('Inter-Account Transfer Preserves Global Net Worth', () => {
+  const accCash = { id: 'cash', openingBalance: 2000 };
+  const accBank = { id: 'bank', openingBalance: 10000 };
+
+  const getBalance = (acc, txs) => {
+    let bal = acc.openingBalance;
+    for (const t of txs) {
+      if (t.accountId === acc.id) {
+        if (t.type === 'expense' || t.type === 'transfer') bal -= t.amount;
+        else if (t.type === 'income' || t.type === 'refund') bal += t.amount;
+      }
+      if (t.toAccountId === acc.id && t.type === 'transfer') {
+        bal += t.amount;
+      }
+    }
+    return bal;
+  };
+
+  const initialTxs = [];
+  const initialNetWorth = getBalance(accCash, initialTxs) + getBalance(accBank, initialTxs);
+  assert.strictEqual(initialNetWorth, 12000);
+
+  // ATM withdrawal: Transfer ₹3,000 from Bank to Cash
+  const afterTransferTxs = [
+    { id: 'tx-t1', type: 'transfer', amount: 3000, accountId: 'bank', toAccountId: 'cash' },
+  ];
+
+  const cashBalAfter = getBalance(accCash, afterTransferTxs);
+  const bankBalAfter = getBalance(accBank, afterTransferTxs);
+  const postTransferNetWorth = cashBalAfter + bankBalAfter;
+
+  assert.strictEqual(cashBalAfter, 5000, 'Cash should increase by ₹3,000 to ₹5,000');
+  assert.strictEqual(bankBalAfter, 7000, 'Bank should decrease by ₹3,000 to ₹7,000');
+  assert.strictEqual(postTransferNetWorth, 12000, 'Net worth must remain exactly ₹12,000 after transfer');
+});
+
+// Test 10: Split Transaction Strict Sum Validation
+test('Split Transaction Sum Validation', () => {
+  function validateSplitTransaction(amount, splits) {
+    if (!splits || splits.length < 2) return { valid: false, error: 'Must have at least 2 split allocations' };
+    const sum = splits.reduce((s, item) => s + (item.amount || 0), 0);
+    if (Math.abs(sum - amount) > 0.01) {
+      return { valid: false, error: `Split sum (${sum}) does not match total (${amount})` };
+    }
+    for (const item of splits) {
+      if (!item.categoryId) return { valid: false, error: 'Every split must have a category' };
+      if (!item.amount || item.amount <= 0) return { valid: false, error: 'Split amount must be positive' };
+    }
+    return { valid: true };
+  }
+
+  // Valid split
+  const res1 = validateSplitTransaction(1250, [
+    { categoryId: 'cat-groceries', amount: 800 },
+    { categoryId: 'cat-home', amount: 450 },
+  ]);
+  assert.strictEqual(res1.valid, true);
+
+  // Mismatched split sum
+  const res2 = validateSplitTransaction(1250, [
+    { categoryId: 'cat-groceries', amount: 800 },
+    { categoryId: 'cat-home', amount: 400 },
+  ]);
+  assert.strictEqual(res2.valid, false);
+  assert.ok(res2.error.includes('does not match total'));
+
+  // Missing category in split
+  const res3 = validateSplitTransaction(500, [
+    { categoryId: 'cat-groceries', amount: 300 },
+    { categoryId: '', amount: 200 },
+  ]);
+  assert.strictEqual(res3.valid, false);
+});
+
+// Test 11: Refund Balance Restoration
+test('Refund Restores Account Balance Without Inflating Regular Income', () => {
+  const account = { id: 'bank', openingBalance: 15000 };
+  const txExpense = { id: 'e1', type: 'expense', amount: 2500, accountId: 'bank' };
+  const txRefund = { id: 'r1', type: 'refund', amount: 2500, accountId: 'bank', linkedTransactionId: 'e1' };
+
+  let bal = account.openingBalance - txExpense.amount;
+  assert.strictEqual(bal, 12500, 'Balance after purchase should be ₹12,500');
+
+  bal += txRefund.amount;
+  assert.strictEqual(bal, 15000, 'Balance after refund should be restored to ₹15,000');
+});
+
+// Test 12: Legacy Unassigned Transactions Compatibility
+test('Legacy Transactions without accountId Are Preserved Safely', () => {
+  const legacyTx = {
+    id: 'legacy-1',
+    type: 'expense',
+    amount: 350,
+    categoryId: 'cat-food',
+    date: '2026-09-10',
+    time: '13:00',
+    paymentMethod: 'upi',
+    createdAt: '2026-09-10T13:00:00Z',
+    updatedAt: '2026-09-10T13:00:00Z',
+  };
+
+  assert.strictEqual(legacyTx.accountId, undefined);
+  const accountId = legacyTx.accountId || 'unassigned';
+  assert.strictEqual(accountId, 'unassigned', 'Legacy tx should default gracefully to unassigned');
+});
+

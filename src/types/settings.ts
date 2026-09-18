@@ -15,5 +15,6 @@ export interface BackupData {
   categories: import('./category').Category[];
   moneySources: import('./otherMoney').MoneySource[];
   moneyReceipts: import('./otherMoney').MoneyReceipt[];
+  accounts?: import('./account').Account[];
   settings: AppSettings;
 }

@@ -4,6 +4,7 @@ import { Card } from '../components/common/Card';
 import {
   PieChart,
   Tag,
+  Wallet,
   Settings,
   Download,
   Upload,
@@ -16,6 +17,18 @@ import { APP_VERSION, APP_NAME } from '../config/version';
 
 export const MorePage: React.FC = () => {
   const menuSections = [
+    {
+      title: 'Money & Accounts',
+      items: [
+        {
+          to: '/accounts',
+          label: 'Accounts & Wallets',
+          desc: 'Cash in Hand, Bank Accounts, UPI, and Wallets',
+          icon: Wallet,
+          color: 'bg-blue-50 dark:bg-blue-950/70 text-blue-600 dark:text-blue-400',
+        },
+      ],
+    },
     {
       title: 'Analytics & Structure',
       items: [

@@ -6,6 +6,8 @@ import { FinanceProvider } from './context/FinanceContext';
 import { AppLayout } from './components/layout/AppLayout';
 import { DashboardPage } from './pages/DashboardPage';
 import { TransactionsPage } from './pages/TransactionsPage';
+import { AccountsPage } from './pages/AccountsPage';
+import { AccountDetailPage } from './pages/AccountDetailPage';
 import { OtherMoneyPage } from './pages/OtherMoneyPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { CategoriesPage } from './pages/CategoriesPage';
@@ -22,6 +24,8 @@ export const App: React.FC = () => {
               <Route element={<AppLayout />}>
                 <Route path="/" element={<DashboardPage />} />
                 <Route path="/transactions" element={<TransactionsPage />} />
+                <Route path="/accounts" element={<AccountsPage />} />
+                <Route path="/accounts/:id" element={<AccountDetailPage />} />
                 <Route path="/other-money" element={<OtherMoneyPage />} />
                 <Route path="/reports" element={<ReportsPage />} />
                 <Route path="/categories" element={<CategoriesPage />} />

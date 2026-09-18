@@ -1,5 +1,5 @@
-export const APP_VERSION = '1.1.0';
-export const APP_VERSION_CODE = 2;
+export const APP_VERSION = '1.2.0';
+export const APP_VERSION_CODE = 3;
 export const APP_NAME = 'FinTracker';
 export const APP_RELEASE_DATE = 'September 2026';
 export const APP_TAGLINE = 'Premium Local-First Personal Finance';
@@ -17,6 +17,21 @@ export interface VersionInfo {
 }
 
 export const APP_CHANGELOG: VersionInfo[] = [
+  {
+    version: '1.2.0',
+    releaseDate: 'September 18, 2026',
+    title: 'Smarter Money Tracking — Accounts, Transfers, Refunds & Splits',
+    highlights: [
+      'Multiple Accounts: Cash in Hand, Bank, UPI, Wallets, and Other with derived balances',
+      'Inter-Account Transfers: ATM withdrawals and account shifts preserve overall net worth',
+      'Distinct Refund tracking with Emerald badges and optional original expense linking',
+      'Split Transactions: Allocate a single bill across multiple categories with strict validation',
+      'Advanced Search & Combinable Multi-Criteria Filters (Payee, Account, Category, Date range, Amount)',
+      'Accounts Overview Dashboard Widget with quick navigation and Add Account button',
+      'Full IndexedDB Schema v2 migration with zero data loss for existing users',
+      'Complete backward-compatible JSON backup and CSV export with account breakdowns'
+    ]
+  },
   {
     version: '1.1.0',
     releaseDate: 'September 18, 2026',

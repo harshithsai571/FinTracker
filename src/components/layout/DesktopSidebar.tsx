@@ -3,6 +3,7 @@ import { NavLink } from 'react-router-dom';
 import {
   Home,
   ReceiptText,
+  Wallet,
   Landmark,
   PieChart,
   Tag,
@@ -19,6 +20,7 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({ onOpenAddModal }
   const links = [
     { to: '/', label: 'Dashboard', icon: Home, end: true },
     { to: '/transactions', label: 'Transactions', icon: ReceiptText },
+    { to: '/accounts', label: 'Accounts', icon: Wallet },
     { to: '/other-money', label: 'Other Money', icon: Landmark },
     { to: '/reports', label: 'Reports & Insights', icon: PieChart },
     { to: '/categories', label: 'Categories', icon: Tag },

@@ -1,26 +1,34 @@
-# FinTracker — Version 1.1.0
+# FinTracker — Version 1.2.0
 
 > **Premium Local-First Personal Finance Management PWA & Android Application**  
-> *Track expenses, income, and external family money with Indian Rupee (₹) precision, zero cloud dependencies, edge-to-edge Android system safe areas, and full offline capability.*
+> *Track expenses, income, multiple accounts, inter-account transfers, refunds, and split bills with Indian Rupee (₹) precision, zero cloud dependencies, and full offline capability.*
 
 ---
 
 ## 1. Project Overview
 
-**FinTracker** is an installable, mobile-first progressive web application (PWA) designed to provide individuals, students, and professionals with total command over their daily finances.
+**FinTracker** is an installable, mobile-first progressive web application (PWA) and Android application designed to provide individuals, students, and professionals with total command over their daily finances.
 
 Unlike generic spreadsheets or cloud-dependent finance trackers, FinTracker operates on a **local-first architecture**:
-* All data resides securely on the user's device using **IndexedDB**.
-* No external backend, telemetry, or server login is required for V1.
-* Works seamlessly **offline** and can be installed directly from modern browsers to iOS and Android home screens.
-* Deployed as a static SPA on **GitHub Pages** with automated GitHub Actions CI/CD.
+* All data resides securely on the user's device using **IndexedDB** (Schema v2).
+* No external backend, telemetry, or server login is required.
+* Works seamlessly **offline** and can be installed directly from modern browsers or as an Android APK.
+* Deployed as a static SPA on **GitHub Pages** with automated GitHub Actions CI/CD for both PWA and Android release APKs.
+
+### 🚀 What's New in v1.2.0 (Smarter Money Tracking)
+* **Multiple Accounts & Real Cash Tracking**: Manage physical cash (*Cash in Hand*), Bank accounts (*Savings, Current, Salary*), UPI (*GPay, PhonePe, Paytm*), and Prepaid Wallets (*Paytm, Amazon Pay*). Derived balances accurately reflect opening balance, income, expenses, refunds, and transfers without hardcoding bank names.
+* **Inter-Account Transfers (ATM & Shifts)**: ATM cash withdrawals and account transfers move money between accounts without altering net worth or counting as false expenses/income.
+* **Distinct Refund Tracking**: Recorded with emerald/teal badges and distinct financial type (`refund`). Optionally link refunds directly to the original expense to restore account balances without inflating regular income.
+* **Split Transactions**: Split a single bill across multiple categories with strict sum-check validation (e.g. supermarket receipt split between *Groceries* and *Home Supplies*). Reports accurately attribute each split to its category.
+* **Advanced Search & Combinable Multi-Criteria Filters**: Search across payee, notes, accounts, categories, and amounts with combinable filters by Type, Account, Category, Date range (Today, Week, Month, Custom), and Amount range (Min, Max) with sorting.
+* **Accounts Overview Dashboard Widget**: Live horizontal scroll showing real account balances with quick actions to view details or add new accounts directly from the dashboard.
+* **Schema v2 Database Migration**: Idempotent IndexedDB upgrade preserving 100% of existing user data, receipts, and categories with zero data loss.
+* **Backward-Compatible Backup & Export**: JSON backups include accounts while safely importing legacy v1.0/v1.1 backups. CSV exports now include account and transfer details.
 
 ### 🚀 What's New in v1.1.0
 * **Android Status-Bar & Gesture-Navigation Safe-Area Fix**: Seamlessly integrates with modern Android edge-to-edge rendering (`env(safe-area-inset-top)` and `env(safe-area-inset-bottom)`) without header overlap or navigation bar clipping.
 * **Dynamic System Bar Theming**: Status bar text and icons automatically synchronize with the app theme (`Style.Light` on light backgrounds, `Style.Dark` on dark backgrounds).
 * **Responsive Financial Typography**: High-precision financial amounts format with `tabular-nums` and responsive scaling so large amounts (e.g. ₹1,25,000.00) remain crisp without overflowing on 360px phones.
-* **Polished Empty States**: Spending Overview features a friendly empty state with an actionable "Add Expense" CTA.
-* **Refined Visual Hierarchy**: Obsidian hero balance gradient, comfortable 44px+ touch targets on month navigation, and prominent tactile floating `+` button.
 
 ---
 

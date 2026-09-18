@@ -3,6 +3,7 @@ import { FinTrackerDB, DB_NAME, DB_VERSION } from './schema';
 import { Transaction } from '../types/transaction';
 import { Category } from '../types/category';
 import { MoneySource, MoneyReceipt, SourceSummary } from '../types/otherMoney';
+import { Account } from '../types/account';
 import { AppSettings, BackupData } from '../types/settings';
 import { DEFAULT_CATEGORIES, DEFAULT_MONEY_SOURCES } from '../config/defaultCategories';
 import { APP_VERSION } from '../config/version';
@@ -14,12 +15,15 @@ export function getDB(): Promise<IDBPDatabase<FinTrackerDB>> {
     dbPromise = openDB<FinTrackerDB>(DB_NAME, DB_VERSION, {
       upgrade(db, oldVersion, newVersion, transaction) {
         // Store: transactions
+        let txStore;
         if (!db.objectStoreNames.contains('transactions')) {
-          const txStore = db.createObjectStore('transactions', { keyPath: 'id' });
+          txStore = db.createObjectStore('transactions', { keyPath: 'id' });
           txStore.createIndex('by-date', 'date');
           txStore.createIndex('by-category', 'categoryId');
           txStore.createIndex('by-source', 'sourceId');
           txStore.createIndex('by-type', 'type');
+        } else {
+          txStore = transaction.objectStore('transactions');
         }
 
         // Store: categories
@@ -44,6 +48,17 @@ export function getDB(): Promise<IDBPDatabase<FinTrackerDB>> {
         // Store: settings
         if (!db.objectStoreNames.contains('settings')) {
           db.createObjectStore('settings');
+        }
+
+        // v2 Migration: accounts store & by-account index
+        if (!db.objectStoreNames.contains('accounts')) {
+          const accStore = db.createObjectStore('accounts', { keyPath: 'id' });
+          accStore.createIndex('by-type', 'type');
+          accStore.createIndex('by-archived', 'isArchived');
+        }
+
+        if (txStore && !txStore.indexNames.contains('by-account')) {
+          txStore.createIndex('by-account', 'accountId');
         }
       },
     });
@@ -346,6 +361,71 @@ export const MoneyReceiptRepository = {
   }
 };
 
+export const AccountRepository = {
+  async getAll(includeArchived = false): Promise<Account[]> {
+    const db = await getDB();
+    const accounts = await db.getAll('accounts');
+    const filtered = includeArchived ? accounts : accounts.filter(a => !a.isArchived);
+    return filtered.sort((a, b) => a.name.localeCompare(b.name));
+  },
+
+  async getById(id: string): Promise<Account | undefined> {
+    const db = await getDB();
+    return db.get('accounts', id);
+  },
+
+  async create(data: Omit<Account, 'id' | 'createdAt' | 'updatedAt'>): Promise<Account> {
+    const db = await getDB();
+    const now = new Date().toISOString();
+    const account: Account = {
+      ...data,
+      id: `acc-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      createdAt: now,
+      updatedAt: now,
+    };
+    await db.put('accounts', account);
+    return account;
+  },
+
+  async update(id: string, data: Partial<Account>): Promise<Account> {
+    const db = await getDB();
+    const existing = await db.get('accounts', id);
+    if (!existing) throw new Error(`Account ${id} not found`);
+    const updated: Account = {
+      ...existing,
+      ...data,
+      id,
+      updatedAt: new Date().toISOString(),
+    };
+    await db.put('accounts', updated);
+    return updated;
+  },
+
+  async archive(id: string, isArchived: boolean = true): Promise<Account> {
+    return this.update(id, { isArchived });
+  },
+
+  async delete(id: string): Promise<void> {
+    const db = await getDB();
+    // Safety check: ensure no transactions are associated with this account
+    const txs = await db.getAll('transactions');
+    const hasTransactions = txs.some(t => t.accountId === id || t.toAccountId === id);
+    if (hasTransactions) {
+      throw new Error('Cannot delete an account with existing transactions. Please archive it instead.');
+    }
+    await db.delete('accounts', id);
+  },
+
+  async bulkPut(accounts: Account[]): Promise<void> {
+    const db = await getDB();
+    const tx = db.transaction('accounts', 'readwrite');
+    for (const acc of accounts) {
+      await tx.store.put(acc);
+    }
+    await tx.done;
+  }
+};
+
 export const SettingsRepository = {
   async getSettings(): Promise<AppSettings> {
     const db = await getDB();
@@ -370,11 +450,12 @@ export const SettingsRepository = {
 
 export async function clearAllDatabaseData(): Promise<void> {
   const db = await getDB();
-  const tx = db.transaction(['transactions', 'categories', 'moneySources', 'moneyReceipts', 'settings'], 'readwrite');
+  const tx = db.transaction(['transactions', 'categories', 'moneySources', 'moneyReceipts', 'settings', 'accounts'], 'readwrite');
   await tx.objectStore('transactions').clear();
   await tx.objectStore('categories').clear();
   await tx.objectStore('moneySources').clear();
   await tx.objectStore('moneyReceipts').clear();
+  await tx.objectStore('accounts').clear();
   await tx.objectStore('settings').clear();
   await tx.done;
   // Re-seed default categories, sources, and settings
@@ -387,6 +468,7 @@ export async function exportDatabaseBackup(): Promise<BackupData> {
   const categories = await db.getAll('categories');
   const moneySources = await db.getAll('moneySources');
   const moneyReceipts = await db.getAll('moneyReceipts');
+  const accounts = await db.getAll('accounts');
   const settings = await SettingsRepository.getSettings();
 
   return {
@@ -396,6 +478,8 @@ export async function exportDatabaseBackup(): Promise<BackupData> {
     categories,
     moneySources,
     moneyReceipts,
+    accounts,
     settings,
   };
 }
+

@@ -1,6 +1,7 @@
 import { Transaction } from '../types/transaction';
 import { Category } from '../types/category';
 import { MoneySource } from '../types/otherMoney';
+import { Account } from '../types/account';
 import { exportDatabaseBackup } from '../db';
 import { escapeCsvField } from '../utils/sanitize';
 import { getTodayString } from '../utils/dates';
@@ -29,10 +30,12 @@ export function exportTransactionsToCsv(
   transactions: Transaction[],
   categories: Category[],
   sources: MoneySource[],
+  accounts: Account[] = [],
   customFilename?: string
 ): string {
   const catMap = new Map(categories.map(c => [c.id, c.name]));
   const sourceMap = new Map(sources.map(s => [s.id, s.name]));
+  const accMap = new Map(accounts.map(a => [a.id, a.name]));
 
   const headers = [
     'Date',
@@ -40,23 +43,41 @@ export function exportTransactionsToCsv(
     'Type',
     'Amount',
     'Category',
+    'Account',
+    'To Account',
     'Payment Method',
-    'Paid From',
+    'External Source',
     'Description',
     'Transaction ID'
   ];
 
-  const rows = transactions.map(tx => [
-    escapeCsvField(tx.date),
-    escapeCsvField(tx.time || ''),
-    escapeCsvField(tx.type.toUpperCase()),
-    escapeCsvField(tx.amount),
-    escapeCsvField(catMap.get(tx.categoryId) || 'Uncategorized'),
-    escapeCsvField(tx.paymentMethod.toUpperCase()),
-    escapeCsvField(tx.sourceId ? (sourceMap.get(tx.sourceId) || 'Other Money') : 'Main Money'),
-    escapeCsvField(tx.description || ''),
-    escapeCsvField(tx.id)
-  ]);
+  const rows = transactions.map(tx => {
+    let catDisplay = catMap.get(tx.categoryId || '') || '';
+    if (tx.splits && tx.splits.length > 0) {
+      catDisplay = `Split: ${tx.splits.map(s => `${s.categoryName || 'Cat'} (₹${s.amount})`).join('; ')}`;
+    } else if (tx.type === 'transfer') {
+      catDisplay = 'Transfer';
+    } else if (tx.type === 'refund') {
+      catDisplay = catDisplay ? `${catDisplay} (Refund)` : 'Refund';
+    }
+
+    const accDisplay = tx.accountId ? (accMap.get(tx.accountId) || 'Account') : 'Unassigned';
+    const toAccDisplay = tx.toAccountId ? (accMap.get(tx.toAccountId) || 'Account') : '';
+
+    return [
+      escapeCsvField(tx.date),
+      escapeCsvField(tx.time || ''),
+      escapeCsvField(tx.type.toUpperCase()),
+      escapeCsvField(tx.amount),
+      escapeCsvField(catDisplay || 'Uncategorized'),
+      escapeCsvField(accDisplay),
+      escapeCsvField(toAccDisplay),
+      escapeCsvField(tx.paymentMethod ? tx.paymentMethod.toUpperCase() : ''),
+      escapeCsvField(tx.sourceId ? (sourceMap.get(tx.sourceId) || 'External') : ''),
+      escapeCsvField(tx.description || ''),
+      escapeCsvField(tx.id)
+    ];
+  });
 
   const csvContent = [
     headers.join(','),
