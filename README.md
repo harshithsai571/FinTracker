@@ -1,7 +1,7 @@
-# FinTracker — Version 1.0.0
+# FinTracker — Version 1.1.0
 
-> **Premium Local-First Personal Finance Management PWA**  
-> *Track expenses, income, and external family money with Indian Rupee (₹) precision, zero cloud dependencies, and full offline capability.*
+> **Premium Local-First Personal Finance Management PWA & Android Application**  
+> *Track expenses, income, and external family money with Indian Rupee (₹) precision, zero cloud dependencies, edge-to-edge Android system safe areas, and full offline capability.*
 
 ---
 
@@ -14,6 +14,13 @@ Unlike generic spreadsheets or cloud-dependent finance trackers, FinTracker oper
 * No external backend, telemetry, or server login is required for V1.
 * Works seamlessly **offline** and can be installed directly from modern browsers to iOS and Android home screens.
 * Deployed as a static SPA on **GitHub Pages** with automated GitHub Actions CI/CD.
+
+### 🚀 What's New in v1.1.0
+* **Android Status-Bar & Gesture-Navigation Safe-Area Fix**: Seamlessly integrates with modern Android edge-to-edge rendering (`env(safe-area-inset-top)` and `env(safe-area-inset-bottom)`) without header overlap or navigation bar clipping.
+* **Dynamic System Bar Theming**: Status bar text and icons automatically synchronize with the app theme (`Style.Light` on light backgrounds, `Style.Dark` on dark backgrounds).
+* **Responsive Financial Typography**: High-precision financial amounts format with `tabular-nums` and responsive scaling so large amounts (e.g. ₹1,25,000.00) remain crisp without overflowing on 360px phones.
+* **Polished Empty States**: Spending Overview features a friendly empty state with an actionable "Add Expense" CTA.
+* **Refined Visual Hierarchy**: Obsidian hero balance gradient, comfortable 44px+ touch targets on month navigation, and prominent tactile floating `+` button.
 
 ---
 
@@ -385,8 +392,8 @@ keytool -genkey -v -keystore release.keystore -alias fintracker -keyalg RSA -key
 FinTracker maintains a single, unified source of truth for versioning:
 
 * **Source of Truth**: [`src/config/version.ts`](src/config/version.ts)
-  * `APP_VERSION`: Current semantic release version string (e.g. `'1.0.0'`).
-  * `APP_VERSION_CODE`: Numeric Android version code (e.g. `1`).
+  * `APP_VERSION`: Current semantic release version string (e.g. `'1.1.0'`).
+  * `APP_VERSION_CODE`: Numeric Android version code (e.g. `2`).
   * `GITHUB_REPO_OWNER`: `'harshithsai571'`.
   * `GITHUB_REPO_NAME`: `'FinTracker'`.
 * **Android Gradle Mapping**: In `android/app/build.gradle`, `versionName` and `versionCode` dynamically read from environment variables (`APP_VERSION`, `APP_VERSION_CODE`) supplied by GitHub Actions during tag builds, falling back gracefully to defaults during local development.

@@ -1,5 +1,5 @@
-export const APP_VERSION = '1.0.0';
-export const APP_VERSION_CODE = 1;
+export const APP_VERSION = '1.1.0';
+export const APP_VERSION_CODE = 2;
 export const APP_NAME = 'FinTracker';
 export const APP_RELEASE_DATE = 'September 2026';
 export const APP_TAGLINE = 'Premium Local-First Personal Finance';
@@ -17,6 +17,20 @@ export interface VersionInfo {
 }
 
 export const APP_CHANGELOG: VersionInfo[] = [
+  {
+    version: '1.1.0',
+    releaseDate: 'September 18, 2026',
+    title: 'Premium UI/UX Upgrade & Android Safe-Area Fix',
+    highlights: [
+      'Android system status-bar and gesture safe-area insets fix',
+      'Dynamic edge-to-edge transparent system bars with Light and Dark theme matching',
+      'Premium Fintech UI upgrade for Header, Balance Hero Card, and Navigation',
+      'Responsive financial amount typography ensuring large ₹ figures remain readable',
+      'Polished spending overview empty state with direct Add Expense CTA',
+      'Enhanced touch targets on month navigation and tactile floating Add button',
+      'Preserved 100% local-first IndexedDB persistence and offline PWA capability'
+    ]
+  },
   {
     version: '1.0.0',
     releaseDate: 'September 16, 2026',

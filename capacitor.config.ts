@@ -17,8 +17,8 @@ const config: CapacitorConfig = {
       showSpinner: false,
     },
     StatusBar: {
-      overlaysWebView: false,
-      backgroundColor: '#059669',
+      overlaysWebView: true,
+      backgroundColor: '#00000000',
     },
     Keyboard: {
       resize: 'body',

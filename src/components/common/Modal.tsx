@@ -56,7 +56,7 @@ export const Modal: React.FC<ModalProps> = ({
         role="dialog"
         aria-modal="true"
         className={cn(
-          'relative w-full bg-white dark:bg-surface-900 rounded-t-3xl sm:rounded-2xl border-t sm:border border-surface-200 dark:border-surface-800 shadow-elevated p-6 z-10 max-h-[92vh] flex flex-col transition-all animate-in slide-in-from-bottom-6 sm:zoom-in-95 duration-200',
+          'relative w-full bg-white dark:bg-surface-900 rounded-t-3xl sm:rounded-2xl border-t sm:border border-surface-200 dark:border-surface-800 shadow-elevated p-6 pb-[max(1.5rem,env(safe-area-inset-bottom,1.5rem))] z-10 max-h-[92vh] flex flex-col transition-all animate-in slide-in-from-bottom-6 sm:zoom-in-95 duration-200',
           maxWidthClass,
           className
         )}

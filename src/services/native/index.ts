@@ -91,11 +91,9 @@ export function getNativeCapabilities(): NativeFeatureFlags {
 export async function setNativeStatusBarTheme(isDark: boolean): Promise<void> {
   if (!isNativePlatform()) return;
   try {
+    await StatusBar.setOverlaysWebView({ overlay: true });
     await StatusBar.setStyle({
       style: isDark ? Style.Dark : Style.Light,
-    });
-    await StatusBar.setBackgroundColor({
-      color: isDark ? '#0f172a' : '#059669',
     });
   } catch (err) {
     // Fail gracefully if status bar plugin is unsupported on current platform

@@ -5,6 +5,10 @@
 @layer base {
   :root {
     --app-height: 100%;
+    --sat: env(safe-area-inset-top, 0px);
+    --sab: env(safe-area-inset-bottom, 0px);
+    --sal: env(safe-area-inset-left, 0px);
+    --sar: env(safe-area-inset-right, 0px);
   }
 
   html {
@@ -38,11 +42,22 @@
   }
 }
 
-/* iOS Safe Areas */
-.pb-safe {
-  padding-bottom: env(safe-area-inset-bottom, 1rem);
-}
-
-.pt-safe {
-  padding-top: env(safe-area-inset-top, 1rem);
+/* Safe Area Inset Utilities (Works across Android, iOS, PWA, and Web with 0px fallback) */
+@layer utilities {
+  .pt-safe {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .pl-safe {
+    padding-left: env(safe-area-inset-left, 0px);
+  }
+  .pr-safe {
+    padding-right: env(safe-area-inset-right, 0px);
+  }
+  .px-safe {
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+  }
 }

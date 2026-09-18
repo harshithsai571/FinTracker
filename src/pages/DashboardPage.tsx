@@ -59,6 +59,7 @@ export const DashboardPage: React.FC = () => {
         transactions={transactions}
         categories={categories}
         selectedMonth={selectedMonth}
+        onAddExpense={onOpenAddModal}
       />
 
       {/* 5. Recent Transactions List */}
