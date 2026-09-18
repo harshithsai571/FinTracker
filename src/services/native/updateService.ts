@@ -178,14 +178,13 @@ export class UpdateService {
     const version = data.tag_name.replace(/^v/i, '').trim();
     const assets = Array.isArray(data.assets) ? data.assets : [];
 
-    // Locate primary signed APK release asset (ignore -unsigned APKs)
-    const apkAsset =
-      assets.find(
-        asset =>
-          asset.name.endsWith('.apk') &&
-          !asset.name.toLowerCase().includes('-unsigned') &&
-          !asset.name.toLowerCase().includes('-debug')
-      ) || assets.find(asset => asset.name.endsWith('.apk') && !asset.name.toLowerCase().includes('-debug'));
+    // Locate primary signed production APK release asset (strictly reject -unsigned and -debug APKs)
+    const apkAsset = assets.find(
+      asset =>
+        asset.name.endsWith('.apk') &&
+        !asset.name.toLowerCase().includes('-unsigned') &&
+        !asset.name.toLowerCase().includes('-debug')
+    );
 
     if (!apkAsset) return null;
 
@@ -236,6 +235,10 @@ export class UpdateService {
     // Offline check
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
       return { status: 'offline', message: 'No internet connection available.' };
+    }
+
+    if (this.state === 'CHECKING') {
+      return { status: 'up_to_date', currentVersion: this.currentVersion };
     }
 
     if (!force && !this.shouldAutoCheck()) {
@@ -417,6 +420,10 @@ export class UpdateService {
       };
     }
 
+    if (this.state === 'INSTALLING') {
+      return { status: 'INSTALLING' };
+    }
+
     const result = await NativeAppUpdate.installUpdate();
     if (result.status === 'INSTALLING') {
       this.state = 'INSTALLING';
@@ -491,35 +498,6 @@ export class UpdateService {
     }
 
     this.state = 'IDLE';
-  }
-
-  /**
-   * Launch Android package download & installation flow (Backwards compatibility).
-   *
-   * On Android, opening the direct verified HTTPS APK download URL initiates
-   * the browser/download manager if native engine is not invoked directly.
-   */
-  public launchApkInstaller(downloadUrl: string): void {
-    if (!downloadUrl) return;
-
-    try {
-      const url = new URL(downloadUrl);
-      if (url.protocol !== 'https:' || !url.hostname.endsWith('github.com')) {
-        console.error('Security alert: Rejected untrusted APK download source:', downloadUrl);
-        return;
-      }
-    } catch {
-      console.error('Invalid APK download URL:', downloadUrl);
-      return;
-    }
-
-    const link = document.createElement('a');
-    link.href = downloadUrl;
-    link.target = '_system';
-    link.rel = 'noopener noreferrer';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
   }
 }
 

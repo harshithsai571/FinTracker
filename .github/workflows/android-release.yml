@@ -104,21 +104,30 @@ jobs:
           ls -la "$ANDROID_SDK_ROOT/platforms/android-36"
           ls -la "$ANDROID_SDK_ROOT/build-tools/36.0.0"
 
-      - name: Prepare signing keystore
+      - name: Validate production signing secrets
         id: keystore_prep
         env:
           KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          if [ -n "$KEYSTORE_BASE64" ]; then
-            echo "Keystore secret detected. Decoding release keystore..."
-            KEYSTORE_FILE="$RUNNER_TEMP/release.keystore"
-            echo "$KEYSTORE_BASE64" | base64 -d > "$KEYSTORE_FILE"
-            echo "keystore_configured=true" >> $GITHUB_OUTPUT
-            echo "keystore_path=$KEYSTORE_FILE" >> $GITHUB_OUTPUT
-          else
-            echo "::warning ::No ANDROID_KEYSTORE_BASE64 secret found. APK will be built as an unsigned release artifact."
-            echo "keystore_configured=false" >> $GITHUB_OUTPUT
+          MISSING_SECRETS=""
+          if [ -z "$KEYSTORE_BASE64" ]; then MISSING_SECRETS="$MISSING_SECRETS ANDROID_KEYSTORE_BASE64"; fi
+          if [ -z "$KEYSTORE_PASSWORD" ]; then MISSING_SECRETS="$MISSING_SECRETS ANDROID_KEYSTORE_PASSWORD"; fi
+          if [ -z "$KEY_ALIAS" ]; then MISSING_SECRETS="$MISSING_SECRETS ANDROID_KEY_ALIAS"; fi
+          if [ -z "$KEY_PASSWORD" ]; then MISSING_SECRETS="$MISSING_SECRETS ANDROID_KEY_PASSWORD"; fi
+
+          if [ -n "$MISSING_SECRETS" ]; then
+            echo "::error ::Missing mandatory production release signing secrets:$MISSING_SECRETS"
+            echo "Production release builds must be signed with the official FinTracker key. Refusing to publish an unsigned APK."
+            exit 1
           fi
+
+          echo "All signing secrets present. Decoding release keystore..."
+          KEYSTORE_FILE="$RUNNER_TEMP/release.keystore"
+          echo "$KEYSTORE_BASE64" | base64 -d > "$KEYSTORE_FILE"
+          echo "keystore_path=$KEYSTORE_FILE" >> $GITHUB_OUTPUT
 
       - name: Build Android Release APK
         working-directory: android
@@ -137,32 +146,33 @@ jobs:
         id: package_artifacts
         run: |
           RELEASE_DIR="android/app/build/outputs/apk/release"
-          APK_FILE=$(find "$RELEASE_DIR" -name "FinTracker-*.apk" | head -n 1)
+          # Look specifically for the signed production APK (exclude any -unsigned or -debug files)
+          APK_FILE=$(find "$RELEASE_DIR" -name "FinTracker-v*.apk" ! -name "*-unsigned.apk" ! -name "*-debug.apk" | head -n 1)
 
           if [ -z "$APK_FILE" ]; then
-            echo "::error ::Could not find generated FinTracker release APK in $RELEASE_DIR"
+            echo "::error ::Signed production release APK not found in $RELEASE_DIR. Build produced no signed artifact."
             exit 1
           fi
 
-          APK_BASENAME=$(basename "$APK_FILE")
-          echo "Found release artifact: $APK_FILE ($APK_BASENAME)"
-
-          # If unsigned artifact was produced, make sure its public release name is clean
-          FINAL_APK="$RELEASE_DIR/FinTracker-${{ steps.version_info.outputs.tag_name }}.apk"
-          if [ "$APK_FILE" != "$FINAL_APK" ]; then
-            cp "$APK_FILE" "$FINAL_APK"
+          # Verify signature using apksigner
+          APKSIGNER="$ANDROID_SDK_ROOT/build-tools/36.0.0/apksigner"
+          if [ -f "$APKSIGNER" ]; then
+            echo "Verifying APK signature with apksigner..."
+            "$APKSIGNER" verify --verbose "$APK_FILE"
           fi
 
-          # Compute SHA-256 checksum
+          APK_BASENAME=$(basename "$APK_FILE")
+          echo "Found verified signed release artifact: $APK_FILE ($APK_BASENAME)"
+
+          # Compute SHA-256 checksum strictly on the signed production APK
           cd "$RELEASE_DIR"
-          FINAL_BASENAME=$(basename "$FINAL_APK")
-          sha256sum "$FINAL_BASENAME" > "${FINAL_BASENAME}.sha256"
+          sha256sum "$APK_BASENAME" > "${APK_BASENAME}.sha256"
           cd - > /dev/null
 
-          echo "apk_path=$FINAL_APK" >> $GITHUB_OUTPUT
-          echo "sha256_path=${FINAL_APK}.sha256" >> $GITHUB_OUTPUT
-          echo "apk_filename=$FINAL_BASENAME" >> $GITHUB_OUTPUT
-          ls -lh "$FINAL_APK" "${FINAL_APK}.sha256"
+          echo "apk_path=$APK_FILE" >> $GITHUB_OUTPUT
+          echo "sha256_path=${APK_FILE}.sha256" >> $GITHUB_OUTPUT
+          echo "apk_filename=$APK_BASENAME" >> $GITHUB_OUTPUT
+          ls -lh "$APK_FILE" "${APK_FILE}.sha256"
 
       - name: Generate release notes
         id: release_notes
