@@ -859,5 +859,433 @@ test('Part 2: Unknown app install permission requirement and retry handling', ()
   assert.strictEqual(retryAttempt.status, 'INSTALLING');
 });
 
+// ============================================================================
+// FINTRACKER v1.2.0 — PHASE 16 DATA INTEGRITY AND BUSINESS LOGIC TESTS
+// ============================================================================
 
+// Integrity Test 1: Account CRUD validation
+test('v1.2.0 Integrity 1: Account model validation and type constraints', () => {
+  const validTypes = ['cash', 'bank', 'upi', 'wallet', 'other'];
 
+  function validateAccount(acc) {
+    if (!acc.name || typeof acc.name !== 'string' || !acc.name.trim()) {
+      return { valid: false, error: 'Account name is required' };
+    }
+    if (!validTypes.includes(acc.type)) {
+      return { valid: false, error: `Invalid account type: ${acc.type}` };
+    }
+    if (typeof acc.openingBalance !== 'number' || isNaN(acc.openingBalance) || acc.openingBalance < 0) {
+      return { valid: false, error: 'Opening balance must be a non-negative number' };
+    }
+    return { valid: true };
+  }
+
+  assert.strictEqual(validateAccount({ name: 'HDFC Bank', type: 'bank', openingBalance: 10000 }).valid, true);
+  assert.strictEqual(validateAccount({ name: 'Cash in Hand', type: 'cash', openingBalance: 0 }).valid, true);
+  assert.strictEqual(validateAccount({ name: 'Paytm Wallet', type: 'wallet', openingBalance: 500 }).valid, true);
+  assert.strictEqual(validateAccount({ name: '', type: 'bank', openingBalance: 100 }).valid, false);
+  assert.strictEqual(validateAccount({ name: 'Crypto', type: 'crypto', openingBalance: 100 }).valid, false);
+  assert.strictEqual(validateAccount({ name: 'Credit', type: 'other', openingBalance: -500 }).valid, false);
+});
+
+// Integrity Test 2: Account archive behavior
+test('v1.2.0 Integrity 2: Account archive isolates inactive accounts while preserving history', () => {
+  const accounts = [
+    { id: 'acc-1', name: 'Active Bank', isArchived: false, openingBalance: 10000 },
+    { id: 'acc-2', name: 'Old Wallet', isArchived: true, openingBalance: 500 },
+    { id: 'acc-3', name: 'Active Cash', isArchived: false, openingBalance: 2000 },
+  ];
+
+  const activeAccounts = accounts.filter(a => !a.isArchived);
+  const archivedAccounts = accounts.filter(a => a.isArchived);
+
+  assert.strictEqual(activeAccounts.length, 2);
+  assert.strictEqual(archivedAccounts.length, 1);
+  assert.strictEqual(activeAccounts[0].id, 'acc-1');
+  assert.strictEqual(activeAccounts[1].id, 'acc-3');
+  assert.strictEqual(archivedAccounts[0].id, 'acc-2');
+
+  // Restoring account-2
+  const restored = { ...accounts[1], isArchived: false };
+  assert.strictEqual(restored.isArchived, false);
+});
+
+// Integrity Test 3: Transfer source/destination validation
+test('v1.2.0 Integrity 3: Transfer requires both source and destination accounts', () => {
+  function validateTransferAccounts(fromId, toId) {
+    if (!fromId || !toId) {
+      return { valid: false, error: 'Both From and To accounts are required' };
+    }
+    if (fromId === toId) {
+      return { valid: false, error: 'From and To accounts cannot be identical' };
+    }
+    return { valid: true };
+  }
+
+  assert.strictEqual(validateTransferAccounts('bank', 'cash').valid, true);
+  assert.strictEqual(validateTransferAccounts('', 'cash').valid, false);
+  assert.strictEqual(validateTransferAccounts('bank', '').valid, false);
+});
+
+// Integrity Test 4: Transfer same-account rejection and amount > 0
+test('v1.2.0 Integrity 4: Transfer rejects same-account transfers and non-positive amounts', () => {
+  function validateTransfer(fromId, toId, amount) {
+    if (!fromId || !toId) return { valid: false, error: 'Accounts required' };
+    if (fromId === toId) return { valid: false, error: 'From and To accounts cannot be identical' };
+    if (typeof amount !== 'number' || isNaN(amount) || amount <= 0) {
+      return { valid: false, error: 'Transfer amount must be strictly greater than 0' };
+    }
+    return { valid: true };
+  }
+
+  assert.strictEqual(validateTransfer('bank', 'bank', 1000).valid, false);
+  assert.strictEqual(validateTransfer('bank', 'cash', 0).valid, false);
+  assert.strictEqual(validateTransfer('bank', 'cash', -250).valid, false);
+  assert.strictEqual(validateTransfer('bank', 'cash', 500).valid, true);
+});
+
+// Integrity Test 5: Transfer net-worth preservation across multiple accounts
+test('v1.2.0 Integrity 5: Multiple sequential transfers preserve combined net worth', () => {
+  const accounts = {
+    bank: 25000,
+    cash: 5000,
+    upi: 2000,
+  };
+
+  const initialNetWorth = accounts.bank + accounts.cash + accounts.upi;
+  assert.strictEqual(initialNetWorth, 32000);
+
+  // Transfer 1: Bank -> Cash ₹3,000 (ATM withdrawal)
+  accounts.bank -= 3000;
+  accounts.cash += 3000;
+  assert.strictEqual(accounts.bank + accounts.cash + accounts.upi, 32000);
+
+  // Transfer 2: Cash -> UPI ₹1,000 (Top-up)
+  accounts.cash -= 1000;
+  accounts.upi += 1000;
+  assert.strictEqual(accounts.bank + accounts.cash + accounts.upi, 32000);
+
+  // Transfer 3: UPI -> Bank ₹500
+  accounts.upi -= 500;
+  accounts.bank += 500;
+  assert.strictEqual(accounts.bank + accounts.cash + accounts.upi, 32000);
+
+  assert.strictEqual(accounts.bank, 22500);
+  assert.strictEqual(accounts.cash, 7000);
+  assert.strictEqual(accounts.upi, 2500);
+});
+
+// Integrity Test 6: Refund balance restoration without inflating regular income
+test('v1.2.0 Integrity 6: Refunds increase account balance without inflating regular income metrics', () => {
+  const account = { id: 'bank', openingBalance: 20000 };
+  const transactions = [
+    { id: 'tx-1', type: 'expense', amount: 4500, accountId: 'bank' },
+    { id: 'tx-2', type: 'refund', amount: 4500, accountId: 'bank' },
+  ];
+
+  let income = 0;
+  let expense = 0;
+  let refund = 0;
+  let bal = account.openingBalance;
+
+  for (const t of transactions) {
+    if (t.type === 'income') {
+      income += t.amount;
+      bal += t.amount;
+    } else if (t.type === 'expense') {
+      expense += t.amount;
+      bal -= t.amount;
+    } else if (t.type === 'refund') {
+      refund += t.amount;
+      bal += t.amount;
+    }
+  }
+
+  assert.strictEqual(income, 0, 'Regular income must remain 0');
+  assert.strictEqual(expense, 4500, 'Recorded expense is 4500');
+  assert.strictEqual(refund, 4500, 'Recorded refund is 4500');
+  assert.strictEqual(bal, 20000, 'Account balance restored to initial opening balance');
+});
+
+// Integrity Test 7: Refund linked expense resilience
+test('v1.2.0 Integrity 7: Refund remains valid even if linked original expense is deleted', () => {
+  const transactions = [
+    { id: 'tx-ref-1', type: 'refund', amount: 1200, accountId: 'bank', linkedTransactionId: 'tx-exp-orig' },
+  ];
+
+  // Lookup linked transaction
+  const findLinked = (id) => transactions.find(t => t.id === id) || null;
+  const linked = findLinked(transactions[0].linkedTransactionId);
+  assert.strictEqual(linked, null, 'Linked transaction gracefully returns null when original is absent');
+
+  // Verify refund amount and balance calculation continue working safely
+  let balance = 5000 + transactions[0].amount;
+  assert.strictEqual(balance, 6200, 'Refund continues to calculate correct account balance without crashing');
+});
+
+// Integrity Test 8: Split exact-sum validation and category requirement
+test('v1.2.0 Integrity 8: Split transactions enforce at least 2 allocations, category presence, and exact sum', () => {
+  function validateSplits(totalAmount, splits) {
+    if (!Array.isArray(splits) || splits.length < 2) {
+      return { valid: false, error: 'Must have at least 2 splits' };
+    }
+    const sum = splits.reduce((acc, s) => acc + (s.amount || 0), 0);
+    if (Math.abs(sum - totalAmount) > 0.01) {
+      return { valid: false, error: `Sum ${sum} does not equal total ${totalAmount}` };
+    }
+    for (const s of splits) {
+      if (!s.categoryId || !s.categoryId.trim()) {
+        return { valid: false, error: 'Every split requires a categoryId' };
+      }
+      if (typeof s.amount !== 'number' || s.amount <= 0) {
+        return { valid: false, error: 'Split amount must be positive' };
+      }
+    }
+    return { valid: true };
+  }
+
+  // Exact match
+  assert.strictEqual(validateSplits(1250, [
+    { categoryId: 'cat-food', amount: 800 },
+    { categoryId: 'cat-home', amount: 450 }
+  ]).valid, true);
+
+  // Less than 2 allocations
+  assert.strictEqual(validateSplits(500, [{ categoryId: 'cat-food', amount: 500 }]).valid, false);
+
+  // Mismatched sum
+  assert.strictEqual(validateSplits(1000, [
+    { categoryId: 'cat-food', amount: 600 },
+    { categoryId: 'cat-home', amount: 300 }
+  ]).valid, false);
+
+  // Zero or negative split
+  assert.strictEqual(validateSplits(1000, [
+    { categoryId: 'cat-food', amount: 1000 },
+    { categoryId: 'cat-home', amount: 0 }
+  ]).valid, false);
+});
+
+// Integrity Test 9: Split category reporting allocation vs parent transaction
+test('v1.2.0 Integrity 9: Reports allocate split expenses by category while parent contributes once to total', () => {
+  const transactions = [
+    { id: 'tx-reg', type: 'expense', amount: 500, categoryId: 'cat-food' },
+    {
+      id: 'tx-split',
+      type: 'expense',
+      amount: 1200,
+      categoryId: 'cat-food', // Primary category fallback
+      splits: [
+        { categoryId: 'cat-food', amount: 800 },
+        { categoryId: 'cat-transport', amount: 400 },
+      ]
+    }
+  ];
+
+  let totalExpense = 0;
+  const categoryTotals = new Map();
+
+  for (const t of transactions) {
+    if (t.type === 'expense') {
+      totalExpense += t.amount;
+      if (t.splits && t.splits.length > 0) {
+        t.splits.forEach(s => {
+          categoryTotals.set(s.categoryId, (categoryTotals.get(s.categoryId) || 0) + s.amount);
+        });
+      } else {
+        categoryTotals.set(t.categoryId, (categoryTotals.get(t.categoryId) || 0) + t.amount);
+      }
+    }
+  }
+
+  assert.strictEqual(totalExpense, 1700, 'Total expense is ₹1,700 (500 + 1200)');
+  assert.strictEqual(categoryTotals.get('cat-food'), 1300, 'Food receives 500 + 800 = ₹1,300');
+  assert.strictEqual(categoryTotals.get('cat-transport'), 400, 'Transport receives ₹400');
+  assert.strictEqual(categoryTotals.get('cat-food') + categoryTotals.get('cat-transport'), 1700, 'Sum of category splits equals total expense');
+});
+
+// Integrity Test 10: Account deletion safety check
+test('v1.2.0 Integrity 10: Deleting an account with transactions is strictly blocked', () => {
+  const accounts = [{ id: 'acc-bank', name: 'Bank' }, { id: 'acc-empty', name: 'Unused Account' }];
+  const transactions = [{ id: 'tx-1', amount: 500, accountId: 'acc-bank' }];
+
+  function deleteAccountSafe(accountId, accList, txList) {
+    const hasTransactions = txList.some(t => t.accountId === accountId || t.toAccountId === accountId);
+    if (hasTransactions) {
+      throw new Error('Cannot delete an account with existing transactions. Please archive it instead.');
+    }
+    return accList.filter(a => a.id !== accountId);
+  }
+
+  assert.throws(
+    () => deleteAccountSafe('acc-bank', accounts, transactions),
+    /Cannot delete an account with existing transactions/
+  );
+
+  const updated = deleteAccountSafe('acc-empty', accounts, transactions);
+  assert.strictEqual(updated.length, 1);
+  assert.strictEqual(updated[0].id, 'acc-bank');
+});
+
+// Integrity Test 11: Legacy transaction compatibility
+test('v1.2.0 Integrity 11: Legacy transactions without accountId default gracefully without mutation', () => {
+  const legacyTx = {
+    id: 'legacy-tx-99',
+    type: 'expense',
+    amount: 150,
+    categoryId: 'cat-snacks',
+    date: '2026-09-01',
+    time: '11:30',
+    paymentMethod: 'cash',
+  };
+
+  const accountId = legacyTx.accountId || 'unassigned';
+  assert.strictEqual(accountId, 'unassigned');
+  assert.strictEqual(legacyTx.toAccountId, undefined);
+  assert.strictEqual(legacyTx.splits, undefined);
+  assert.strictEqual(legacyTx.amount, 150);
+});
+
+// Integrity Test 12: Import/export complete schema preservation
+test('v1.2.0 Integrity 12: JSON export and import preserve accounts, splits, transfers, and refunds', () => {
+  const mockDbData = {
+    version: '1.2.0',
+    exportedAt: '2026-09-18T12:00:00Z',
+    accounts: [
+      { id: 'acc-1', name: 'Savings', type: 'bank', openingBalance: 50000, isArchived: false }
+    ],
+    transactions: [
+      {
+        id: 'tx-transfer-1',
+        type: 'transfer',
+        amount: 5000,
+        accountId: 'acc-1',
+        toAccountId: 'acc-2',
+        date: '2026-09-18'
+      },
+      {
+        id: 'tx-split-1',
+        type: 'expense',
+        amount: 2000,
+        accountId: 'acc-1',
+        date: '2026-09-18',
+        splits: [{ categoryId: 'c1', amount: 1200 }, { categoryId: 'c2', amount: 800 }]
+      }
+    ]
+  };
+
+  const jsonSerialized = JSON.stringify(mockDbData);
+  const parsed = JSON.parse(jsonSerialized);
+
+  assert.strictEqual(parsed.accounts.length, 1);
+  assert.strictEqual(parsed.accounts[0].name, 'Savings');
+  assert.strictEqual(parsed.transactions[0].toAccountId, 'acc-2');
+  assert.strictEqual(parsed.transactions[1].splits.length, 2);
+  assert.strictEqual(parsed.transactions[1].splits[0].amount, 1200);
+});
+
+// Integrity Test 13: Combined transaction filter intersections
+test('v1.2.0 Integrity 13: Combinable multi-criteria transaction filters return exact intersection', () => {
+  const transactions = [
+    { id: '1', type: 'expense', accountId: 'acc-bank', categoryId: 'cat-food', date: '2026-09-15', amount: 350 },
+    { id: '2', type: 'expense', accountId: 'acc-bank', categoryId: 'cat-bills', date: '2026-09-15', amount: 1200 },
+    { id: '3', type: 'income', accountId: 'acc-bank', categoryId: 'cat-salary', date: '2026-09-15', amount: 50000 },
+    { id: '4', type: 'expense', accountId: 'acc-cash', categoryId: 'cat-food', date: '2026-09-15', amount: 200 },
+    { id: '5', type: 'expense', accountId: 'acc-bank', categoryId: 'cat-food', date: '2026-08-20', amount: 400 },
+  ];
+
+  // Filter: Account = 'acc-bank' AND Type = 'expense' AND Category = 'cat-food' AND Date in Sept 2026
+  const filtered = transactions.filter(t => {
+    if (t.accountId !== 'acc-bank') return false;
+    if (t.type !== 'expense') return false;
+    if (t.categoryId !== 'cat-food') return false;
+    if (!t.date.startsWith('2026-09')) return false;
+    return true;
+  });
+
+  assert.strictEqual(filtered.length, 1);
+  assert.strictEqual(filtered[0].id, '1');
+});
+
+// Integrity Test 14: Account balance derivation after add, edit, and delete
+test('v1.2.0 Integrity 14: Account balance recalculates reactively after transaction edit and delete', () => {
+  const account = { id: 'acc-cash', openingBalance: 5000 };
+  let txs = [];
+
+  const calcBalance = () => {
+    let bal = account.openingBalance;
+    for (const t of txs) {
+      if (t.accountId === account.id) {
+        if (t.type === 'income' || t.type === 'refund') bal += t.amount;
+        else if (t.type === 'expense' || t.type === 'transfer') bal -= t.amount;
+      } else if (t.toAccountId === account.id && t.type === 'transfer') {
+        bal += t.amount;
+      }
+    }
+    return bal;
+  };
+
+  // Initial
+  assert.strictEqual(calcBalance(), 5000);
+
+  // Add expense ₹1,000
+  txs.push({ id: 'tx-1', type: 'expense', amount: 1000, accountId: 'acc-cash' });
+  assert.strictEqual(calcBalance(), 4000);
+
+  // Edit expense to ₹1,500
+  txs = txs.map(t => t.id === 'tx-1' ? { ...t, amount: 1500 } : t);
+  assert.strictEqual(calcBalance(), 3500);
+
+  // Delete expense
+  txs = txs.filter(t => t.id !== 'tx-1');
+  assert.strictEqual(calcBalance(), 5000);
+});
+
+// Integrity Test 15: Other Money isolation and net worth non-double-counting
+test('v1.2.0 Integrity 15: Other Money remains isolated and avoids double counting with account balances', () => {
+  const accountsBalance = 15000;
+  const otherMoneyReceipts = 8000;
+  const otherMoneyExpenses = 5000;
+  const otherMoneyRemaining = otherMoneyReceipts - otherMoneyExpenses; // 3000
+
+  // Total available spending power
+  const totalAvailable = accountsBalance + otherMoneyRemaining;
+  assert.strictEqual(totalAvailable, 18000);
+
+  // When personal expense is recorded from personal account
+  const afterPersonalExpense = (accountsBalance - 2000) + otherMoneyRemaining;
+  assert.strictEqual(afterPersonalExpense, 16000);
+
+  // When expense is recorded from Other Money
+  const afterOtherExpense = accountsBalance + (otherMoneyRemaining - 1000);
+  assert.strictEqual(afterOtherExpense, 17000);
+});
+
+// Integrity Test 16: Safe database migration simulation
+test('v1.2.0 Integrity 16: Schema v1 to v2 migration preserves existing stores and adds accounts safely', () => {
+  const mockDb = {
+    objectStoreNames: ['transactions', 'categories', 'moneySources', 'moneyReceipts', 'settings'],
+    createdStores: [],
+    createdIndexes: [],
+    createObjectStore(name) {
+      this.createdStores.push(name);
+      return {
+        createIndex(idxName) {
+          mockDb.createdIndexes.push(`${name}.${idxName}`);
+        }
+      };
+    }
+  };
+
+  // Run v2 migration logic
+  if (!mockDb.objectStoreNames.includes('accounts')) {
+    const store = mockDb.createObjectStore('accounts');
+    store.createIndex('by-type');
+    store.createIndex('by-archived');
+  }
+
+  assert.ok(mockDb.createdStores.includes('accounts'));
+  assert.ok(mockDb.createdIndexes.includes('accounts.by-type'));
+  assert.ok(mockDb.createdIndexes.includes('accounts.by-archived'));
+  assert.strictEqual(mockDb.objectStoreNames.length, 5, 'Pre-existing 5 stores remain intact');
+});

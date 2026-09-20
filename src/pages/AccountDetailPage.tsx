@@ -188,7 +188,7 @@ export const AccountDetailPage: React.FC = () => {
           <div className="grid grid-cols-3 gap-2 pt-3 border-t border-surface-800/80 text-center">
             <div className="bg-surface-800/50 p-2.5 rounded-xl">
               <span className="text-[10px] text-surface-400 block mb-0.5">Opening</span>
-              <span className="text-xs font-bold text-surface-200">
+              <span className="text-xs font-bold text-surface-200 truncate block">
                 {formatCurrency(account.openingBalance)}
               </span>
             </div>
@@ -197,7 +197,7 @@ export const AccountDetailPage: React.FC = () => {
               <span className="text-[10px] text-emerald-400 flex items-center justify-center gap-1 mb-0.5">
                 <TrendingUp className="w-3 h-3" /> Inflow
               </span>
-              <span className="text-xs font-bold text-emerald-400">
+              <span className="text-xs font-bold text-emerald-400 truncate block">
                 +{formatCurrency(summary.totalInflow)}
               </span>
             </div>
@@ -206,9 +206,37 @@ export const AccountDetailPage: React.FC = () => {
               <span className="text-[10px] text-rose-400 flex items-center justify-center gap-1 mb-0.5">
                 <TrendingDown className="w-3 h-3" /> Outflow
               </span>
-              <span className="text-xs font-bold text-rose-400">
+              <span className="text-xs font-bold text-rose-400 truncate block">
                 -{formatCurrency(summary.totalOutflow)}
               </span>
+            </div>
+          </div>
+
+          {/* Detailed Breakdown: Income, Expenses, Refunds, Transfers In/Out, Count */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-[11px] pt-1">
+            <div className="bg-surface-800/40 px-2.5 py-1.5 rounded-lg flex items-center justify-between border border-surface-800/60">
+              <span className="text-surface-400">Total Income:</span>
+              <span className="font-bold text-emerald-400">+{formatCurrency(summary.totalIncome)}</span>
+            </div>
+            <div className="bg-surface-800/40 px-2.5 py-1.5 rounded-lg flex items-center justify-between border border-surface-800/60">
+              <span className="text-surface-400">Total Expenses:</span>
+              <span className="font-bold text-rose-400">-{formatCurrency(summary.totalExpenses)}</span>
+            </div>
+            <div className="bg-surface-800/40 px-2.5 py-1.5 rounded-lg flex items-center justify-between border border-surface-800/60">
+              <span className="text-surface-400">Total Refunds:</span>
+              <span className="font-bold text-teal-400">+{formatCurrency(summary.totalRefunds)}</span>
+            </div>
+            <div className="bg-surface-800/40 px-2.5 py-1.5 rounded-lg flex items-center justify-between border border-surface-800/60">
+              <span className="text-surface-400">Transfers In:</span>
+              <span className="font-bold text-blue-400">+{formatCurrency(summary.totalTransfersIn)}</span>
+            </div>
+            <div className="bg-surface-800/40 px-2.5 py-1.5 rounded-lg flex items-center justify-between border border-surface-800/60">
+              <span className="text-surface-400">Transfers Out:</span>
+              <span className="font-bold text-surface-300">-{formatCurrency(summary.totalTransfersOut)}</span>
+            </div>
+            <div className="bg-surface-800/40 px-2.5 py-1.5 rounded-lg flex items-center justify-between border border-surface-800/60">
+              <span className="text-surface-400">Transactions:</span>
+              <span className="font-bold text-surface-200">{summary.transactionCount}</span>
             </div>
           </div>
 

@@ -11,13 +11,16 @@ import {
   Zap,
   Award,
   BarChart3,
-  Percent
+  Percent,
+  RotateCcw,
+  Landmark,
+  ArrowRightLeft
 } from 'lucide-react';
 
 type ReportPeriod = 'this_month' | 'last_month' | 'last_3_months' | 'this_year' | 'all_time';
 
 export const ReportsPage: React.FC = () => {
-  const { transactions, categories } = useFinance();
+  const { transactions, categories, activeAccounts } = useFinance();
   const [period, setPeriod] = useState<ReportPeriod>('this_month');
 
   // Filter transactions according to selected period
@@ -56,6 +59,7 @@ export const ReportsPage: React.FC = () => {
   const {
     totalIncome,
     totalExpense,
+    totalRefund,
     netChange,
     savingsRate,
     highestCategory,
@@ -164,6 +168,38 @@ export const ReportsPage: React.FC = () => {
     return max;
   }, [monthlyTrends]);
 
+  // Account activity breakdown for the selected period
+  const accountBreakdown = useMemo(() => {
+    return activeAccounts.map(account => {
+      let income = 0;
+      let expense = 0;
+      let refund = 0;
+      let transfersIn = 0;
+      let transfersOut = 0;
+
+      for (const t of filteredTransactions) {
+        if (t.accountId === account.id) {
+          if (t.type === 'income') income += t.amount;
+          else if (t.type === 'expense') expense += t.amount;
+          else if (t.type === 'refund') refund += t.amount;
+          else if (t.type === 'transfer') transfersOut += t.amount;
+        } else if (t.toAccountId === account.id && t.type === 'transfer') {
+          transfersIn += t.amount;
+        }
+      }
+
+      return {
+        account,
+        income,
+        expense,
+        refund,
+        transfersIn,
+        transfersOut,
+        totalActivity: income + expense + refund + transfersIn + transfersOut,
+      };
+    });
+  }, [activeAccounts, filteredTransactions]);
+
   return (
     <div className="space-y-5 animate-in fade-in duration-300">
       {/* Header with Period Tabs */}
@@ -201,8 +237,8 @@ export const ReportsPage: React.FC = () => {
         </div>
       </div>
 
-      {/* 4 Key Metric Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      {/* Key Metric Cards */}
+      <div className={`grid grid-cols-2 ${totalRefund > 0 ? 'sm:grid-cols-3 lg:grid-cols-5' : 'sm:grid-cols-4'} gap-3`}>
         {/* Income */}
         <Card className="p-4 bg-emerald-50/50 dark:bg-emerald-950/30 border-emerald-100 dark:border-emerald-900/40">
           <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-700 dark:text-emerald-400 mb-1">
@@ -222,6 +258,21 @@ export const ReportsPage: React.FC = () => {
             {formatCurrency(totalExpense)}
           </p>
         </Card>
+
+        {/* Refunds */}
+        {totalRefund > 0 && (
+          <Card className="p-4 bg-teal-50/50 dark:bg-teal-950/30 border-teal-100 dark:border-teal-900/40">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-teal-700 dark:text-teal-400 mb-1">
+              <RotateCcw className="w-3.5 h-3.5" /> Total Refunds
+            </div>
+            <p className="text-base sm:text-lg font-extrabold text-teal-800 dark:text-teal-300">
+              +{formatCurrency(totalRefund)}
+            </p>
+            <span className="text-[10px] text-surface-400">
+              Restored funds
+            </span>
+          </Card>
+        )}
 
         {/* Net Savings */}
         <Card className="p-4">
@@ -376,6 +427,74 @@ export const ReportsPage: React.FC = () => {
           </div>
         )}
       </Card>
+
+      {/* Account Activity Breakdown (Phase 14) */}
+      {activeAccounts.length > 0 && (
+        <Card className="p-5">
+          <div className="flex items-center justify-between pb-3 border-b border-surface-100 dark:border-surface-800 mb-4">
+            <div className="flex items-center gap-2">
+              <Landmark className="w-4 h-4 text-brand-600 dark:text-brand-400" />
+              <h3 className="text-sm font-bold text-surface-900 dark:text-surface-100">
+                Account Activity Breakdown
+              </h3>
+            </div>
+            <span className="text-xs font-semibold text-surface-400">
+              {activeAccounts.length} active {activeAccounts.length === 1 ? 'account' : 'accounts'}
+            </span>
+          </div>
+
+          <div className="space-y-3">
+            {accountBreakdown.map(({ account, income, expense, refund, transfersIn, transfersOut, totalActivity }) => (
+              <div
+                key={account.id}
+                className="p-3.5 rounded-2xl bg-surface-50/70 dark:bg-surface-850 border border-surface-200/70 dark:border-surface-800/80 space-y-2.5"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div
+                      className="w-7 h-7 rounded-lg flex items-center justify-center text-white shrink-0 shadow-xs"
+                      style={{ backgroundColor: account.color || '#2563eb' }}
+                    >
+                      <Landmark className="w-3.5 h-3.5" />
+                    </div>
+                    <span className="text-xs font-bold text-surface-900 dark:text-white truncate">
+                      {account.name}
+                    </span>
+                    <span className="text-[10px] text-surface-500 capitalize">
+                      ({account.type})
+                    </span>
+                  </div>
+
+                  <span className="text-xs font-bold text-surface-500 dark:text-surface-400">
+                    {totalActivity === 0 ? 'No activity in period' : `${formatCurrency(income + refund - expense)} net`}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] pt-1 border-t border-surface-200/50 dark:border-surface-800/60">
+                  <div className="flex items-center justify-between">
+                    <span className="text-surface-500 dark:text-surface-400">Income:</span>
+                    <span className="font-semibold text-emerald-600 dark:text-emerald-400">+{formatCurrency(income)}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-surface-500 dark:text-surface-400">Expense:</span>
+                    <span className="font-semibold text-rose-600 dark:text-rose-400">-{formatCurrency(expense)}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-surface-500 dark:text-surface-400">Refunds:</span>
+                    <span className="font-semibold text-teal-600 dark:text-teal-400">+{formatCurrency(refund)}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-surface-500 dark:text-surface-400">Transfers:</span>
+                    <span className="font-semibold text-blue-600 dark:text-blue-400">
+                      +{formatCurrency(transfersIn)} / -{formatCurrency(transfersOut)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
     </div>
   );
 };

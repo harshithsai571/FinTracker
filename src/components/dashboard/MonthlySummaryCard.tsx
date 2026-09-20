@@ -21,16 +21,20 @@ export const MonthlySummaryCard: React.FC<MonthlySummaryCardProps> = ({
 
   let monthIncome = 0;
   let monthExpenses = 0;
+  let monthRefunds = 0;
 
   for (const t of monthTransactions) {
     if (t.type === 'income') {
       monthIncome += t.amount;
-    } else {
+    } else if (t.type === 'expense') {
       monthExpenses += t.amount;
+    } else if (t.type === 'refund') {
+      monthRefunds += t.amount;
     }
+    // Note: transfers are inter-account and do not affect monthly income or expense
   }
 
-  const netChange = monthIncome - monthExpenses;
+  const netChange = monthIncome + monthRefunds - monthExpenses;
   const isNetPositive = netChange >= 0;
 
   return (

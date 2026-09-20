@@ -1,7 +1,7 @@
 apply plugin: 'com.android.application'
 
-def appVersionCode = System.getenv("APP_VERSION_CODE") ? Integer.parseInt(System.getenv("APP_VERSION_CODE")) : 4
-def appVersionName = System.getenv("APP_VERSION") ?: "1.1.1"
+def appVersionCode = System.getenv("APP_VERSION_CODE") ? Integer.parseInt(System.getenv("APP_VERSION_CODE")) : 5
+def appVersionName = System.getenv("APP_VERSION") ?: "1.2.0"
 
 android {
     namespace = "com.fintracker.app"

@@ -29,10 +29,18 @@ export const SpendingOverview: React.FC<SpendingOverviewProps> = ({
 
   const totalExpense = expenses.reduce((sum, t) => sum + t.amount, 0);
 
-  // Group by category
+  // Group by category (allocating split transactions to their respective categories)
   const catTotals = new Map<string, number>();
   expenses.forEach(t => {
-    catTotals.set(t.categoryId, (catTotals.get(t.categoryId) || 0) + t.amount);
+    if (t.splits && t.splits.length > 0) {
+      t.splits.forEach(s => {
+        if (s.categoryId) {
+          catTotals.set(s.categoryId, (catTotals.get(s.categoryId) || 0) + (s.amount || 0));
+        }
+      });
+    } else if (t.categoryId) {
+      catTotals.set(t.categoryId, (catTotals.get(t.categoryId) || 0) + t.amount);
+    }
   });
 
   const sortedCategories = Array.from(catTotals.entries())
